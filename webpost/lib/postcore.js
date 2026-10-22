@@ -17,6 +17,13 @@ const ROOT = path.resolve(__dirname, '..', '..'); // 绿联社区发帖工具/
 // 原因: 应用目录里的 auth.json 会随文件夹拷贝/打包一起被分享出去，等于把登录态送人。
 // 放 %LOCALAPPDATA% 后，工具文件夹可以随便拷给别人，始终干净。
 function userDataDir() {
+  // 测试隔离（V1.5.1）：设了 UGREEN_USER_DIR 就用指定目录，
+  // 自动化测试从此不再碰真实用户数据（曾两次把测试记录写进用户发布记录，教训深刻）
+  if (process.env.UGREEN_USER_DIR) {
+    const dir = process.env.UGREEN_USER_DIR;
+    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+    return dir;
+  }
   const base = process.env.LOCALAPPDATA
     || path.join(process.env.USERPROFILE || '', 'AppData', 'Local');
   const dir = path.join(base, 'UGREENPostWorkbench');

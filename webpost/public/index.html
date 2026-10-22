@@ -17,8 +17,10 @@
   .hbtn { font-size: 13px; background: rgba(255,255,255,.16); color: #fff; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; }
   /* 顶栏下拉菜单（导入▾/导出▾，V1.3.0） */
   .hmenu { position: absolute; top: 100%; left: 0; margin-top: 4px; background: #fff; color: #333;
-    border: 1px solid #ddd; border-radius: 8px; min-width: 240px; max-width: 320px; z-index: 90;
+    border: 1px solid #ddd; border-radius: 8px; min-width: 240px; z-index: 90;
     box-shadow: 0 4px 14px rgba(0,0,0,.15); overflow: hidden; }
+  /* 靠屏幕右缘的下拉要向左展开，否则整个菜单被裁出屏幕外（实测踩过两次） */
+  .drop-right .hmenu { left: auto; right: 0; }
   .hmenu button { display: block; width: 100%; text-align: left; font-size: 13px; padding: 9px 14px;
     background: #fff; border: none; cursor: pointer; color: #333; white-space: normal; line-height: 1.45; }
   .hmenu button small { display: block; font-size: 11px; color: #999; margin-top: 2px; white-space: normal; }
@@ -194,17 +196,18 @@
   <select class="draftsel" id="draftSel" title="切换草稿"></select>
   <div class="spacer"></div>
   <button class="hbtn" onclick="selfCheck()" title="检查绿联官方发帖页结构是否变了（官方改版后用它定位）">🩺 体检</button>
+  <button class="hbtn" onclick="layoutCheck()" title="发表前给排版把把脉：外链图片、空段落、字墙、表格边框">📐 排版</button>
   <button class="hbtn" onclick="refreshBoards(true)" title="重新扫描各版块发帖权限">🔄 刷新版块</button>
   <button class="hbtn" onclick="openPosts()" title="发过的帖子都记在这里，可一键载入再发一次">📝 发布记录</button>
   <button class="hbtn" onclick="openSnippets()" title="常用段落（开头结尾、设备信息表、免责声明）一键插入">📚 片段库</button>
-  <div style="position:relative;display:inline-block;">
+  <div style="position:relative;display:inline-block;" class="drop-right">
     <button class="hbtn" onclick="toggleMenu('importMenu', this)" title="从文件导入稿件">📥 导入 ▾</button>
     <div id="importMenu" class="hmenu" style="display:none;">
       <button onclick="hideMenus(); document.getElementById('importMd').click()">📄 Markdown 稿件<small>（.md 和配图文件一起选，图会插回原位）</small></button>
       <button onclick="hideMenus(); document.getElementById('importHtml').click()">🌐 HTML 文件<small>（图片可内嵌在文件里）</small></button>
     </div>
   </div>
-  <div style="position:relative;display:inline-block;">
+  <div style="position:relative;display:inline-block;" class="drop-right">
     <button class="hbtn" onclick="toggleMenu('exportMenu', this)" title="把当前稿件存成文件">💾 导出 ▾</button>
     <div id="exportMenu" class="hmenu" style="display:none;">
       <button onclick="hideMenus(); exportMd()">📄 Markdown<small>（纯文字稿 + 图片单独存）</small></button>
@@ -262,6 +265,16 @@
       </select>
       <button onclick="toggleIndent()" title="段落首行缩进两格（再点一次取消）">缩进</button>
       <button onclick="clearFormat()" title="清除选中文字的加粗/颜色/字号等样式">清除格式</button>
+      <span class="sep"></span>
+      <select onchange="setFontFamily(this.value); this.selectedIndex=0;" title="选中文字的字体（论坛高级编辑器同款能力）">
+        <option value="">字体</option>
+        <option value="微软雅黑">微软雅黑</option>
+        <option value="宋体">宋体</option>
+        <option value="黑体">黑体</option>
+        <option value="楷体">楷体</option>
+        <option value="仿宋">仿宋</option>
+        <option value="Tahoma">Tahoma</option>
+      </select>
       <span class="sep"></span>
       <button onclick="cmd('insertUnorderedList')" title="项目符号">• 列表</button>
       <button onclick="cmd('insertOrderedList')" title="编号列表">1. 列表</button>
@@ -465,7 +478,7 @@ function setBlock(tag) { editor.focus(); document.execCommand('formatBlock', fal
 // 2=特小 3=小 5=大 6=特大（4 与默认视觉接近，就不放了，免得选项太多）
 function setFont(n) {
   if (!n) return;
-  editor.focus();
+  restoreEditorSel();
   document.execCommand('fontSize', false, n);
   onEdit(); updateToolbarState();
 }
@@ -615,21 +628,7 @@ async function insertCode() {
   if (!replaceMarkerWith(html)) { editor.focus(); document.execCommand('insertHTML', false, html); }
   onEdit();
 }
-async function insertTable() {
-  placeMarker();
-  const r = await modal({ title: '插入表格', fields: [
-    { key: 'rows', label: '行数:', type: 'number', value: '3' },
-    { key: 'cols', label: '列数:', type: 'number', value: '3' },
-  ]});
-  if (!r) { removeMarker(); return; }
-  const rows = Math.max(1, Math.min(20, parseInt(r.rows) || 3));
-  const cols = Math.max(1, Math.min(10, parseInt(r.cols) || 3));
-  let t = '<table><tbody>';
-  for (let i = 0; i < rows; i++) { t += '<tr>'; for (let j = 0; j < cols; j++) t += '<td>&nbsp;</td>'; t += '</tr>'; }
-  t += '</tbody></table><p><br></p>';
-  if (!replaceMarkerWith(t)) { editor.focus(); document.execCommand('insertHTML', false, t); }
-  onEdit();
-}
+// 旧版 insertTable 已由 V1.6.0 的新实现取代（见文件后段：带表头/边框样式，发出去不挤成一团）
 async function insertLink() {
   const sel = window.getSelection().toString();
   placeMarker();
@@ -1975,6 +1974,95 @@ function confirmLoad(rec) {
   const cur = plainText().length;
   if (cur < 10) return true;
   return confirm('载入这篇会把编辑器内容替换掉（当前内容已按标题存草稿，不会丢）。继续吗？');
+}
+
+// 选区恢复：点工具栏的 select/按钮会让编辑器失焦，execCommand 前先把上次的选区放回去。
+// 没有这一步，从下拉选"字体"经常打在空气上（实测踩过）。
+document.addEventListener('selectionchange', () => {
+  try {
+    const sel = window.getSelection();
+    if (sel.rangeCount && editor && editor.contains(sel.anchorNode)) {
+      window.__lastEditorRange = sel.getRangeAt(0).cloneRange();
+    }
+  } catch (e) {}
+});
+function restoreEditorSel() {
+  if (window.__lastEditorRange) {
+    try {
+      const s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(window.__lastEditorRange);
+      return;
+    } catch (e) {}
+  }
+  editor.focus();
+}
+// 字体（V1.6.0）：论坛高级编辑器同款，发出去是 [font=]，原版支持
+function setFontFamily(f) {
+  if (!f) return;
+  restoreEditorSel();
+  document.execCommand('fontName', false, f);
+  onEdit(); updateToolbarState();
+}
+// 表格（V1.6.0）：带边框样式直接写进 td，发出去不会挤成一团
+function insertTable() {
+  editor.focus();
+  modal({
+    title: '插入表格', okText: '插入',
+    fields: [
+      { key: 'cols', label: '列数（1-10）', type: 'text', value: '3' },
+      { key: 'rows', label: '数据行数（1-20）', type: 'text', value: '3' },
+      { key: 'head', label: '首行作为表头（加粗 + 浅色底）', type: 'checkbox', value: true },
+    ],
+  }).then(r => {
+    if (!r) return;
+    const cols = Math.min(Math.max(parseInt(r.cols) || 3, 1), 10);
+    const rows = Math.min(Math.max(parseInt(r.rows) || 3, 1), 20);
+    const total = rows + (r.head ? 1 : 0);
+    let t = '<table style="border-collapse:collapse;width:100%"><tbody>';
+    for (let i = 0; i < total; i++) {
+      t += '<tr>';
+      for (let c = 0; c < cols; c++) {
+        const th = r.head && i === 0;
+        t += '<' + (th ? 'th' : 'td') + ' style="border:1px solid #bbb;padding:6px 10px;' + (th ? 'background:#F2F7F4;' : '') + '">' + (th ? '表头' : '&nbsp;') + '</' + (th ? 'th' : 'td') + '>';
+      }
+      t += '</tr>';
+    }
+    t += '</tbody></table><p><br></p>';
+    document.execCommand('insertHTML', false, t);
+    // execCommand 会洗掉 table 上的 border-collapse，插完补回来（不补发出去挤成一团）
+    const tables = editor.querySelectorAll('table');
+    const last = tables[tables.length - 1];
+    if (last) last.style.borderCollapse = 'collapse';
+    onEdit(); updateCounts(); updatePreview();
+    toast('已插入 ' + cols + '×' + total + ' 表格');
+  });
+}
+// 排版体检（V1.6.0）：发表前把"发出去才发现"的问题提前翻出来。
+// 只查确定的、论坛真实会出的问题，不搞吹毛求疵。
+function layoutCheck() {
+  const plain = plainText();
+  const imgs = Array.from(editor.querySelectorAll('img'));
+  const warn = [], info = [];
+  const ext = imgs.filter(i => { const s = i.getAttribute('src') || ''; return !/^(data:|\/draft-images\/)/.test(s); });
+  if (ext.length) warn.push(ext.length + ' 张图片是外部链接（不是本工作台上传的），发帖后很可能显示不出来 —— 建议删掉重新粘贴');
+  if (!imgs.length && plain.length > 300) info.push('正文超过 300 字但一张图都没有，配几张图阅读体验更好');
+  const empties = Array.from(editor.children).filter(el => /^(P|DIV)$/.test(el.tagName) && !el.textContent.trim() && !el.querySelector('img')).length;
+  if (empties >= 5) warn.push('有 ' + empties + ' 个空段落，发出去会有一长串空行');
+  const longs = Array.from(editor.querySelectorAll('p,div')).filter(el => el.textContent.trim().length > 800);
+  if (longs.length) warn.push(longs.length + ' 个段落超过 800 字没分段 —— 手机上读是一堵字墙，建议在合适的位置断段');
+  const tables = Array.from(editor.querySelectorAll('table'));
+  const noBorder = tables.filter(t => !t.style.borderCollapse && !t.querySelector('[style*="border"]') && !t.getAttribute('border'));
+  if (noBorder.length) warn.push(noBorder.length + ' 个表格没有边框样式，发出去可能挤成一团 —— 用工具栏「表格」插入的会自带边框');
+  if (tables.length && !noBorder.length) info.push('表格 ' + tables.length + ' 个，边框正常');
+  if (editor.querySelector('script,style,iframe,embed')) warn.push('内容里有 script / style / iframe —— 论坛会把这些整段剥掉，等于白写');
+  if (!plain.length && !imgs.length) { toast('编辑器是空的，没什么好体检的'); return; }
+  const lines = warn.map(t => '⚠️ ' + t).concat(info.map(t => '· ' + t));
+  modal({
+    title: warn.length ? '排版体检：' + warn.length + ' 个建议处理' : '排版体检：没毛病',
+    okText: '知道了',
+    msg: (lines.length ? lines.join('\n') : '没有发现会影响发布效果的问题。') + '\n\n⚠️ 建议处理 · · 仅供参考',
+  });
 }
 
 // ---------- 顶栏下拉菜单 + HTML 导入导出（V1.3.0）----------

@@ -1,6 +1,6 @@
 {
   "name": "ugreen-post-workbench",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "绿联社区发帖工作台（本地网页版；版本号唯一源头：服务端/安装器/zip 都读这里）",
   "dependencies": {
     "playwright-core": "^1.64.1"
