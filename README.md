@@ -26,11 +26,11 @@
 
 ## 安装
 
-1. 到 [Releases](https://github.com/gulugulupao/ugreen-post-workbench/releases/latest) 下载 `绿联发帖工作台_安装版_V*.exe`
+1. 到 [Releases](https://github.com/gulugulupao/ugreen-post-workbench/releases/latest) 下载安装包（`*-setup-*.exe`，约 166MB）
 2. 双击安装（Windows 可能提示"未知发布者"，点「更多信息 → 仍要运行」—— 个人开发者未做代码签名）
 3. 启动后按提示登录绿联社区账号
 
-便携版 zip 仅作应急备份，日常用安装版。
+便携版（`*-portable-*.zip`，解压即用）仅作应急备份，日常用安装版。
 
 ## 开发
 
