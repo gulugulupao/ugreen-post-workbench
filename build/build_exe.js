@@ -106,8 +106,12 @@ function buildPayload(chromiumSrc) {
     fs.copyFileSync(path.join(ROOT, 'icon.ico'), path.join(PAYLOAD, ICON_NAME));
     fs.copyFileSync(path.join(ROOT, 'icon.ico'), path.join(BUILD, 'app_icon.ico'));
     // payload 是增量复用的（浏览器大件不重拷）—— 旧命名的图标残留必须清掉，
-    // 否则会被 [Files] 一并复制进程序目录，和"带版本图标"的设计打架（实测踩过）
+    // 否则会被 [Files] 一并复制进程序目录，和"带版本图标"的设计打架（实测踩过）。
+    // 顺带把历代版本图标也清了：装完虽然会删，但不该出现在分发包里
     fs.rmSync(path.join(PAYLOAD, 'app_icon.ico'), { force: true });
+    for (const f of fs.readdirSync(PAYLOAD)) {
+      if (/^app_icon_v[\d.]+\.ico$/.test(f) && f !== ICON_NAME) fs.rmSync(path.join(PAYLOAD, f), { force: true });
+    }
   } else {
     die('缺少 icon.ico（快捷方式与安装器图标）');
   }

@@ -376,4 +376,140 @@ async function checkPostUrl(url, account) {
   }
 }
 
-module.exports = { Poster, CHROME, AUTH, ACCOUNTS_DIR, authPathFor, USER_DIR, checkPostUrl };
+/**
+ * 编辑已发帖子（V1.5.0）：
+ *   apply=false 只读取（把论坛上的标题/正文拉回工作台）
+ *   apply=true  读取后用传入的 title/html 覆盖，并点「提交编辑」保存
+ * 有头模式：这是写操作，让用户能亲眼看到过程。
+ * 不依赖 URL 拼接（Discuz 编辑需要 tid+pid），直接在帖子页找「编辑」链接进去，最稳。
+ */
+async function editPostFlow({ url, title, html, account, apply, log }) {
+  const authPath = authPathFor(account);
+  if (!fs.existsSync(authPath)) throw new Error('登录态不存在，先登录再编辑');
+  const say = (m) => { try { log(m); } catch (e) {} };
+  let browser, ctx;
+  try {
+    browser = await chromium.launch({
+      executablePath: CHROME, headless: false,
+      args: ['--no-sandbox', '--start-maximized', '--window-size=1400,1000'],
+    });
+    ctx = await browser.newContext({ storageState: authPath, viewport: { width: 1400, height: 1000 } });
+    const page = await ctx.newPage();
+    say('打开发帖记录里的帖子页面…');
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(2500);
+
+    // 「提示信息」页 = 帖子没了/没权限/还在审核
+    const pageTitle = await page.title();
+    if (/提示信息/.test(pageTitle)) {
+      const tip = await page.evaluate(() => {
+        const el = document.querySelector('#messagetext, .alert_info, .alert-error, .jump_c');
+        return el ? el.innerText : '';
+      }).catch(() => '');
+      throw new Error('打不开这篇帖子：' + (tip || pageTitle).replace(/\s+/g, ' ').slice(0, 100));
+    }
+
+    // 找「编辑」入口（Discuz 各楼层都有，取第一个能用的）
+    const editHref = await page.evaluate(() => {
+      const links = Array.from(document.querySelectorAll('a[href*="action=edit"]'));
+      for (const a of links) {
+        if (a.offsetParent !== null) return a.href;
+      }
+      return links.length ? links[0].href : '';
+    });
+    if (!editHref) throw new Error('这篇帖子上没找到「编辑」入口 —— 可能不是你发的，或该版块不允许编辑');
+    say('进入编辑页…');
+    await page.goto(editHref, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(2500);
+
+    // 编辑页也可能弹「提示信息」（如编辑时间窗限制）
+    if (/提示信息/.test(await page.title())) {
+      const tip = await page.evaluate(() => {
+        const el = document.querySelector('#messagetext, .alert_info, .alert-error');
+        return el ? el.innerText : '';
+      }).catch(() => '');
+      throw new Error('进不了编辑页：' + (tip || '论坛拒绝了这次编辑').replace(/\s+/g, ' ').slice(0, 100));
+    }
+
+    // 读现有内容（编辑器 iframe 或纯文本框，两通道都试）
+    const iframeSel = await fa.resolveSelector(page, 'editorIframe');
+    const taSel = await fa.resolveSelector(page, 'editorTextarea');
+    const subjSel = await fa.resolveSelector(page, 'subject');
+    const old = await page.evaluate(({ iframeSel, taSel, subjSel }) => {
+      let html = '';
+      if (iframeSel) {
+        const f = document.querySelector(iframeSel);
+        if (f && f.contentDocument) html = f.contentDocument.body.innerHTML;
+      }
+      if (!html && taSel) {
+        const ta = document.querySelector(taSel);
+        if (ta) html = ta.value;
+      }
+      const t = subjSel ? (document.querySelector(subjSel) || {}).value || '' : '';
+      return { title: t, html };
+    }, { iframeSel, taSel, subjSel });
+    say('已读到原帖内容（' + old.html.length + ' 字符）');
+
+    if (!apply) {
+      await ctx.storageState({ path: authPath }).catch(() => {});
+      await browser.close();
+      return { ok: true, oldTitle: old.title, oldHtml: old.html };
+    }
+
+    // 覆盖：标题 + 正文
+    if (subjSel && title) {
+      await page.locator(subjSel).first().fill(String(title).slice(0, 80));
+      say('标题已填: ' + title);
+    }
+    if (iframeSel) {
+      await page.evaluate(({ iframeSel, html }) => {
+        const f = document.querySelector(iframeSel);
+        if (f && f.contentDocument) f.contentDocument.body.innerHTML = html;
+      }, { iframeSel, html });
+    } else if (taSel) {
+      await page.evaluate(({ taSel, html }) => {
+        const ta = document.querySelector(taSel);
+        if (ta) {
+          const tmp = document.createElement('div');
+          tmp.innerHTML = html;
+          ta.value = tmp.innerText;
+          ta.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }, { taSel, html });
+    } else {
+      throw new Error('编辑页上找不到正文编辑器（官方可能改版了）');
+    }
+    say('新内容已写入，提交保存…');
+
+    // 提交按钮：Discuz 编辑页仍是 form#postform #postsubmit（文字是「提交编辑」）
+    let saved = false;
+    for (const sel of fa.ANCHORS.submit.candidates) {
+      try {
+        const loc = page.locator(sel);
+        if (await loc.count() === 0) continue;
+        await loc.first().click({ timeout: 8000 });
+        saved = true;
+        break;
+      } catch (e) { /* 下一个候选 */ }
+    }
+    if (!saved) throw new Error('编辑页上没找到保存按钮（官方可能改版了）');
+    await page.waitForTimeout(5000);
+    const afterUrl = page.url();
+    if (/action=edit/.test(afterUrl)) {
+      // 原地不动多半是被拦了（编辑间隔/权限变化），把提示带出来
+      const tip = await page.evaluate(() => {
+        const el = document.querySelector('#messagetext, .alert_info, .alert-error');
+        return el ? el.innerText : '';
+      }).catch(() => '');
+      throw new Error('点了保存但没跳走，可能被论坛拦下：' + (tip || afterUrl).replace(/\s+/g, ' ').slice(0, 120));
+    }
+    await ctx.storageState({ path: authPath }).catch(() => {});
+    say('编辑已保存 ✓');
+    return { ok: true, edited: true, url: afterUrl };
+  } finally {
+    // 编辑流程保留窗口 3 秒让用户瞥一眼结果，然后收掉（内容已保存，无需用户操作）
+    try { if (browser) { await new Promise(r => setTimeout(r, 3000)); await browser.close(); } } catch (e) {}
+  }
+}
+
+module.exports = { Poster, CHROME, AUTH, ACCOUNTS_DIR, authPathFor, USER_DIR, checkPostUrl, editPostFlow };

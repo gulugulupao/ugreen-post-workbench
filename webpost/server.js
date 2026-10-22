@@ -22,7 +22,7 @@ process.on('unhandledRejection', err => {
   console.error('[异步异常-已拦截] ' + (err && err.stack || err));
 });
 const { chromium } = require('playwright-core');
-const { Poster, AUTH, ACCOUNTS_DIR, authPathFor, CHROME, USER_DIR, checkPostUrl } = require('./lib/postcore');
+const { Poster, AUTH, ACCOUNTS_DIR, authPathFor, CHROME, USER_DIR, checkPostUrl, editPostFlow } = require('./lib/postcore');
 const { getBoards, CACHE_FILE } = require('./lib/boards');
 
 const PORT = process.env.PORT || 8791;
@@ -548,6 +548,40 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, { ok: true, status: r.status, reason: r.reason });
       } catch (e) {
         return send(res, 200, { ok: false, error: '检测失败: ' + String(e.message).slice(0, 140) });
+      }
+    }
+
+    // 编辑已发帖子（V1.5.0）：apply=false 只把论坛内容拉回来；apply=true 用传入内容覆盖并保存
+    if (p === '/api/edit-post' && req.method === 'POST') {
+      try {
+        const body = await readBody(req);
+        const url = String(body.url || '');
+        if (!/club\.ugnas\.com/.test(url)) return send(res, 200, { ok: false, error: '不是有效的社区帖子链接' });
+        if (body.apply) {
+          if (!String(body.html || '').trim()) return send(res, 200, { ok: false, error: '编辑器内容是空的，不覆盖' });
+        }
+        const logs = [];
+        const r = await editPostFlow({
+          url, account: String(body.account || ''),
+          title: String(body.title || ''), html: String(body.html || ''),
+          apply: !!body.apply,
+          log: (m) => { logs.push(m); console.log('[编辑]', m); },
+        });
+        if (body.apply) {
+          // 编辑成功也刷新记录里的状态
+          try {
+            const list = readPosts();
+            const rec = list[Number(body.index) - 1];
+            if (rec) { rec.status = 'published'; rec.editedAt = Date.now(); writePosts(list); }
+          } catch (_) {}
+        }
+        return send(res, 200, {
+          ok: true, apply: !!body.apply,
+          oldTitle: r.oldTitle || '', oldHtml: r.oldHtml || '',
+          logs,
+        });
+      } catch (e) {
+        return send(res, 200, { ok: false, error: String(e.message || '编辑失败').slice(0, 200) });
       }
     }
 

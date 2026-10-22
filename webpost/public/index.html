@@ -17,10 +17,11 @@
   .hbtn { font-size: 13px; background: rgba(255,255,255,.16); color: #fff; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; }
   /* 顶栏下拉菜单（导入▾/导出▾，V1.3.0） */
   .hmenu { position: absolute; top: 100%; left: 0; margin-top: 4px; background: #fff; color: #333;
-    border: 1px solid #ddd; border-radius: 8px; min-width: 200px; z-index: 90;
+    border: 1px solid #ddd; border-radius: 8px; min-width: 240px; max-width: 320px; z-index: 90;
     box-shadow: 0 4px 14px rgba(0,0,0,.15); overflow: hidden; }
   .hmenu button { display: block; width: 100%; text-align: left; font-size: 13px; padding: 9px 14px;
-    background: #fff; border: none; cursor: pointer; color: #333; }
+    background: #fff; border: none; cursor: pointer; color: #333; white-space: normal; line-height: 1.45; }
+  .hmenu button small { display: block; font-size: 11px; color: #999; margin-top: 2px; white-space: normal; }
   .hmenu button:hover { background: #E8F5EE; color: #0F7A49; }
   .hbtn:hover { background: rgba(255,255,255,.28); }
   .loginbanner { display: none; background: #fff3cd; border-bottom: 1px solid #ffe69c; padding: 12px 18px; font-size: 13px; line-height: 1.9; color: #664d03; }
@@ -199,15 +200,15 @@
   <div style="position:relative;display:inline-block;">
     <button class="hbtn" onclick="toggleMenu('importMenu', this)" title="从文件导入稿件">📥 导入 ▾</button>
     <div id="importMenu" class="hmenu" style="display:none;">
-      <button onclick="hideMenus(); document.getElementById('importMd').click()">📄 Markdown（配图一起选）</button>
-      <button onclick="hideMenus(); document.getElementById('importHtml').click()">🌐 HTML 文件</button>
+      <button onclick="hideMenus(); document.getElementById('importMd').click()">📄 Markdown 稿件<small>（.md 和配图文件一起选，图会插回原位）</small></button>
+      <button onclick="hideMenus(); document.getElementById('importHtml').click()">🌐 HTML 文件<small>（图片可内嵌在文件里）</small></button>
     </div>
   </div>
   <div style="position:relative;display:inline-block;">
     <button class="hbtn" onclick="toggleMenu('exportMenu', this)" title="把当前稿件存成文件">💾 导出 ▾</button>
     <div id="exportMenu" class="hmenu" style="display:none;">
-      <button onclick="hideMenus(); exportMd()">📄 Markdown</button>
-      <button onclick="hideMenus(); exportHtml()">🌐 HTML（图片内嵌，可粘回论坛）</button>
+      <button onclick="hideMenus(); exportMd()">📄 Markdown<small>（纯文字稿 + 图片单独存）</small></button>
+      <button onclick="hideMenus(); exportHtml()">🌐 HTML<small>（图片内嵌，单文件可直接粘回论坛）</small></button>
     </div>
   </div>
   <input type="file" id="importMd" accept=".md,.markdown,.txt,image/*" multiple style="display:none">
@@ -1828,7 +1829,7 @@ async function openPosts() {
   const r = await modal({
     title: '发布记录（' + list.length + ' 条）',
     okText: '载入这篇',
-    msg: menu + '\n\n「载入这篇」把内容放回编辑器改完再发；「检测状态」用你已登录的浏览器\n无头打开帖子看一眼，自动更新 ✅/⏳/❌（帖子少的条目无法检测）。',
+    msg: menu + '\n\n常用操作：输序号 →「载入这篇」改完再发；「✏ 编辑这篇」用编辑器当前内容\n直接覆盖论坛上的帖子；「⤓ 拉回工作台」把帖子内容取回来改；「🔍 检测状态」查审核结果。',
     fields: [{ key: 'idx', label: '序号', type: 'text', value: '1' }],
     actions: [
       { text: '🌐 打开原帖', cls: 'btn-gray', fn: async (close) => {
@@ -1836,6 +1837,65 @@ async function openPosts() {
         const n = Number((document.getElementById('mdBody').querySelector('input') || {}).value || 1);
         const rec = list[n - 1];
         if (rec && rec.url) window.open(rec.url, '_blank'); else toast('这条没有链接（待审核的帖子还没生成链接）');
+      } },
+      { text: '⤓ 拉回工作台', cls: 'btn-gray', fn: async (close) => {
+        close();
+        const n = Number((document.getElementById('mdBody').querySelector('input') || {}).value || 1);
+        const rec = list[n - 1];
+        if (!rec || !rec.url) { toast('这条没有链接，拉不回来'); return; }
+        showOverlay('正在打开帖子读取内容（约 15 秒）…');
+        try {
+          const j2 = await fetchWithTimeout('/api/edit-post', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ index: n, url: rec.url, account: rec.account, apply: false }),
+          }, 120000).then(x => x.json());
+          if (!j2.ok) throw new Error(j2.error || '读取失败');
+          closeOverlay();
+          const go = await modal({
+            title: '拉回成功', okText: '放进编辑器',
+            msg: '原帖标题：' + (j2.oldTitle || '(无)') + '\n原帖正文 ' + j2.oldHtml.length + ' 字符。\n\n放进编辑器会覆盖当前内容（当前内容已自动存草稿）。',
+          });
+          if (!go) return;
+          document.getElementById('postTitle').value = j2.oldTitle || '';
+          editor.innerHTML = j2.oldHtml || '';
+          updateTitleCount(); updateCounts(); updatePreview(); saveDraft();
+          toast('已拉回，改完用「✏ 编辑这篇」发回去');
+        } catch (e) {
+          document.getElementById('ovTitle').textContent = '拉取失败';
+          document.getElementById('ovResult').textContent = e.message;
+          document.getElementById('ovClose').style.display = 'inline-block';
+        }
+      } },
+      { text: '✏ 编辑这篇', cls: 'btn-gray', fn: async (close) => {
+        close();
+        const n = Number((document.getElementById('mdBody').querySelector('input') || {}).value || 1);
+        const rec = list[n - 1];
+        if (!rec || !rec.url) { toast('这条没有链接，编辑不了'); return; }
+        const go = await modal({
+          title: '用当前内容覆盖这篇帖子？', okText: '覆盖并保存', danger: true,
+          msg: '将用编辑器里<b>当前的内容</b>替换论坛上这篇帖子：\n标题：' + (document.getElementById('postTitle').value.trim() || rec.title) +
+            '\n\n⚠️ 论坛上的原内容会被覆盖（不可撤销）。只是想改几个字？先点「⤓ 拉回工作台」改好再来。',
+        });
+        if (!go) return;
+        showOverlay('正在编辑论坛上的帖子（会弹出浏览器窗口，约 1 分钟）…');
+        try {
+          const j2 = await fetchWithTimeout('/api/edit-post', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              index: n, url: rec.url, account: rec.account, apply: true,
+              title: document.getElementById('postTitle').value.trim() || rec.title,
+              html: editor.innerHTML,
+            }),
+          }, 240000).then(x => x.json());
+          if (!j2.ok) throw new Error(j2.error || '编辑失败');
+          document.getElementById('ovTitle').textContent = '✓ 编辑已保存';
+          document.getElementById('ovResult').innerHTML = '论坛上的帖子已更新。<br>点「📝 发布记录 → 🌐 打开原帖」可以看到新内容。';
+        } catch (e) {
+          document.getElementById('ovTitle').textContent = '✗ 编辑失败';
+          document.getElementById('ovResult').textContent = e.message;
+        } finally {
+          document.getElementById('ovClose').style.display = 'inline-block';
+        }
       } },
       { text: '🔍 检测状态', cls: 'btn-gray', fn: async (close) => {
         close();
