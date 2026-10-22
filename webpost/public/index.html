@@ -194,6 +194,7 @@
     <div class="acct-menu" id="acctMenu"></div>
   </div>
   <select class="draftsel" id="draftSel" title="切换草稿"></select>
+  <button class="hbtn" onclick="manageDrafts()" title="草稿管理：查看/删除草稿" style="padding:6px 8px;">🗂</button>
   <div class="spacer"></div>
   <button class="hbtn" onclick="selfCheck()" title="检查绿联官方发帖页结构是否变了（官方改版后用它定位）">🩺 体检</button>
   <button class="hbtn" onclick="layoutCheck()" title="发表前给排版把把脉：外链图片、空段落、字墙、表格边框">📐 排版</button>
@@ -861,8 +862,40 @@ function updateCounts() {
 
 // ---------- 草稿(按标题多份) ----------
 function draftKey(title) { return DRAFT_PREFIX + (title.trim() || 'untitled'); }
+// 标题规范化（V1.6.1）：零宽字符/多余空格肉眼看不出来，但会让同名草稿存出好几份
+// （实测：同一篇帖在草稿栏堆了 7 条）。所有草稿读写一律走规范化后的标题。
+function normDraftTitle(t) {
+  return (t || '').replace(/[\u200b\u200c\u200d\uFEFF\u00ad]/g, '').replace(/\s+/g, ' ').trim();
+}
 function draftIndex() {
   try { return JSON.parse(localStorage.getItem(DRAFT_INDEX) || '[]'); } catch (e) { return []; }
+}
+// 启动迁移（V1.6.1）：把历史草稿按规范化标题分组，同名只留最新一份，索引重建。
+// 跑一次即可，之后新保存的草稿本来就是规范化的。
+function migrateDrafts() {
+  try {
+    const groups = {};
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+    keys.filter(k => k.startsWith(DRAFT_PREFIX)).forEach(k => {
+      let d = null;
+      try { d = JSON.parse(localStorage.getItem(k)); } catch (e) {}
+      if (!d || !d.html) { localStorage.removeItem(k); return; }
+      const tmp = document.createElement('div');
+      tmp.innerHTML = d.html;
+      if (!tmp.querySelector('img') && !tmp.textContent.trim()) { localStorage.removeItem(k); return; }
+      const name = normDraftTitle(d.title || k.slice(DRAFT_PREFIX.length)) || 'untitled';
+      const savedAt = d.savedAt || '';
+      if (!groups[name] || savedAt > (groups[name].savedAt || '')) {
+        groups[name] = { title: name, html: d.html, cat: d.cat || '', savedAt };
+      }
+    });
+    // 统一删旧 key（含同组里不是最新的变体），再写回规范 key
+    keys.filter(k => k.startsWith(DRAFT_PREFIX)).forEach(k => localStorage.removeItem(k));
+    const idx = Object.values(groups).sort((a, b) => (b.savedAt || '').localeCompare(a.savedAt || ''));
+    idx.forEach(d => localStorage.setItem(DRAFT_PREFIX + d.title, JSON.stringify(d)));
+    localStorage.setItem(DRAFT_INDEX, JSON.stringify(idx.slice(0, 30)));
+  } catch (e) {}
 }
 function saveDraftToIndex(title) {
   const list = draftIndex().filter(d => d.title !== title);
@@ -882,7 +915,7 @@ function draftHasContent(title) {
   } catch (e) { return false; }
 }
 function saveDraft(manual) {
-  const title = titleInput.value.trim();
+  const title = normDraftTitle(titleInput.value);
   // 空壳不存：没标题也没内容（连图都没有）时别污染草稿列表
   if (!title && !editor.innerHTML.trim() && !editor.querySelector('img')) {
     if (manual) toast('编辑区是空的，没东西可保存');
@@ -924,6 +957,55 @@ function loadDraftByTitle(title) {
   } catch (e) {}
   return false;
 }
+// 草稿管理（V1.6.1）：列出全部草稿（名称/时间/大小），输序号即可删除
+async function manageDrafts() {
+  refreshDraftSel();
+  const raw = draftIndex();
+  const list = raw.filter(d => draftHasContent(d.title));
+  if (!list.length) {
+    await modal({ title: '草稿管理', msg: '目前没有任何草稿。写帖时标题一变就会自动存一份草稿，都在这里管理。' });
+    return;
+  }
+  const menu = list.map((d, i) => {
+    let size = 0;
+    try {
+      const dd = JSON.parse(localStorage.getItem(draftKey(d.title)) || 'null');
+      const tmp = document.createElement('div');
+      tmp.innerHTML = (dd && dd.html) || '';
+      size = tmp.textContent.trim().length + '字/' + tmp.querySelectorAll('img').length + '图';
+    } catch (e) {}
+    return (i + 1) + '. ' + (d.title || 'untitled').slice(0, 26) + ' · ' + (d.savedAt || '').replace('T', ' ').slice(0, 16) + ' · ' + size;
+  }).join('\n');
+  const r = await modal({
+    title: '草稿管理（' + list.length + ' 份）',
+    okText: '关闭',
+    msg: menu + '\n\n输入序号可删除对应草稿（不填直接关闭）。同名草稿只保留最新一份。',
+    fields: [{ key: 'del', label: '删除序号（可多个，如 2,3）', type: 'text', value: '' }],
+    actions: [
+      { text: '🗑 清空全部草稿', cls: 'btn-gray', fn: async (close) => {
+        close();
+        const ok = await modal({ title: '清空全部草稿', okText: '全部删除', danger: true, msg: '将删除全部 ' + list.length + ' 份草稿（不可恢复）。当前编辑器里的内容不受影响。' });
+        if (!ok) return;
+        list.forEach(d => { try { localStorage.removeItem(draftKey(d.title)); } catch (e) {} });
+        try { localStorage.setItem(DRAFT_INDEX, '[]'); } catch (e) {}
+        refreshDraftSel();
+        toast('已清空 ' + list.length + ' 份草稿');
+      } },
+    ],
+  });
+  if (!r || !String(r.del || '').trim()) { refreshDraftSel(); return; }
+  const picks = String(r.del).split(/[,，\s]+/).map(Number).filter(n => n >= 1 && n <= list.length).sort((a, b) => b - a);
+  if (!picks.length) { toast('序号不对'); return; }
+  let n = 0;
+  picks.forEach(i => {
+    try { localStorage.removeItem(draftKey(list[i - 1].title)); n++; } catch (e) {}
+  });
+  const remain = draftIndex().filter(d => draftHasContent(d.title));
+  try { localStorage.setItem(DRAFT_INDEX, JSON.stringify(remain.slice(0, 30))); } catch (e) {}
+  refreshDraftSel();
+  toast('已删除 ' + n + ' 份草稿');
+}
+
 function refreshDraftSel() {
   const sel = document.getElementById('draftSel');
   const cur = titleInput.value.trim() || 'untitled';
@@ -2580,6 +2662,7 @@ function initHintBar() {
 
 // ---------- 启动 ----------
 checkLogin();
+migrateDrafts();    // 草稿去重迁移（V1.6.1）：同名只留最新，历史零宽字符变体合并
 refreshDraftSel();
 updateCounts();
 updateTitleCount();
