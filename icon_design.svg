@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="118" fill="#12905A"/>
+  <rect width="512" height="512" rx="118" fill="none" stroke="#0B6B3E" stroke-width="8" stroke-opacity="0.35"/>
+  <path d="M128 98 H384 V360 L336 408 H128 Z" fill="#FFFFFF"/>
+  <path d="M384 360 L336 408 L336 360 Z" fill="#DFF3E7"/>
+  <g fill="#12905A" opacity="0.32">
+    <rect x="162" y="190" width="188" height="20" rx="10"/>
+    <rect x="162" y="246" width="188" height="20" rx="10"/>
+    <rect x="162" y="302" width="188" height="20" rx="10"/>
+    <rect x="162" y="358" width="112" height="20" rx="10"/>
+  </g>
+  
+  <g transform="translate(229 228) rotate(32) scale(1.06)">
+    <rect x="-24" y="-186" width="48" height="44" rx="13" fill="#F2A9A8"/>
+    <rect x="-26" y="-150" width="52" height="30" rx="4" fill="#CBD2D8"/>
+    <rect x="-27" y="-146" width="10" height="22" fill="#B4BCC3"/>
+    <rect x="-26" y="-120" width="52" height="92" rx="3" fill="#FFC61E"/>
+    <rect x="6" y="-120" width="20" height="92" rx="3" fill="#E0A800"/>
+    <path d="M-26 -28 L26 -28 L0 24 Z" fill="#E3B77E"/>
+    <path d="M-9 6 L9 6 L0 28 Z" fill="#3A3A3A"/>
+  </g>
+</svg>

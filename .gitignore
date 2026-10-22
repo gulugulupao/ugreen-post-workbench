@@ -1,0 +1,35 @@
+# ===== 运行数据与隐私：一律不进仓库 =====
+# 登录凭证（默认账号 + 账号柜）
+webpost/auth.json
+webpost/accounts/
+# 版块缓存（含论坛昵称）、草稿正文与插图、报错截图（含已登录的论坛页面）
+webpost/boards_cache.json
+webpost/draft/
+webpost/shots/
+# 内置浏览器与便携 node（几百 MB，且属运行期产物）
+webpost/browser/
+node/
+# 用户私有的二维码/图片若以后新增，也别误提交
+webpost/public/draft-images/
+
+# ===== 构建产物 =====
+build/payload/
+build/dist/
+build/stage_zip/
+build/license_install.rtf
+build/installer.nsi
+build/installer.iss
+build/app_icon.ico
+build/tools/
+*.exe
+*.zip
+# 各版本归档（几百 MB，只留本地，发布走 GitHub Release）
+归档/
+# 内部开发脚本：含本机绝对路径与已登录论坛页面截图，属于个人工作现场，不入库
+开发测试脚本/
+
+# ===== 依赖与日志 =====
+node_modules/
+*.log
+.DS_Store
+Thumbs.db

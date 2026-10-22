@@ -1,0 +1,2445 @@
+<!DOCTYPE html>
+<!-- 绿联社区发帖工作台 — Copyright (c) 2026 很多问题的小明同学（GitHub @gulugulupao）
+     授权：MIT License + 附加保护条款（保留署名 / 禁止冒名 / 禁止商用冒用），见 LICENSE.txt -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>绿联社区发帖工作台</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f0f2f5; color: #333; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  header { background: #1f6f43; color: #fff; padding: 10px 18px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+  header h1 { font-size: 17px; font-weight: 600; }
+  header .status { font-size: 12px; background: rgba(255,255,255,.18); padding: 3px 10px; border-radius: 10px; cursor: pointer; }
+  header .status.bad { background: #d03050; }
+  header .spacer { flex: 1; }
+  .hbtn { font-size: 13px; background: rgba(255,255,255,.16); color: #fff; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; }
+  /* 顶栏下拉菜单（导入▾/导出▾，V1.3.0） */
+  .hmenu { position: absolute; top: 100%; left: 0; margin-top: 4px; background: #fff; color: #333;
+    border: 1px solid #ddd; border-radius: 8px; min-width: 200px; z-index: 90;
+    box-shadow: 0 4px 14px rgba(0,0,0,.15); overflow: hidden; }
+  .hmenu button { display: block; width: 100%; text-align: left; font-size: 13px; padding: 9px 14px;
+    background: #fff; border: none; cursor: pointer; color: #333; }
+  .hmenu button:hover { background: #E8F5EE; color: #0F7A49; }
+  .hbtn:hover { background: rgba(255,255,255,.28); }
+  .loginbanner { display: none; background: #fff3cd; border-bottom: 1px solid #ffe69c; padding: 12px 18px; font-size: 13px; line-height: 1.9; color: #664d03; }
+  .loginbanner b { color: #d03050; }
+  .loginbanner .steps { background: #fff; border: 1px solid #ffe69c; border-radius: 6px; padding: 8px 12px; margin-top: 6px; }
+  .titlebar { display: flex; gap: 10px; padding: 10px 18px 0; flex-shrink: 0; align-items: center; }
+  .titlebar input { flex: 1; font-size: 16px; padding: 10px 14px; border: 1px solid #d9d9d9; border-radius: 6px; outline: none; }
+  .titlebar input:focus { border-color: #1f6f43; }
+  .titlebar select { font-size: 14px; padding: 10px; border: 1px solid #d9d9d9; border-radius: 6px; background: #fff; max-width: 170px; }
+  .tcount { flex-shrink: 0; font-size: 12px; color: #8c8c8c; margin-left: -4px; }
+  .tcount.warn { color: #c07d16; font-weight: 600; }
+  .hint { position: relative; padding: 8px 34px 8px 18px; font-size: 13px; color: #1f6f43; background: #e8f5ee; flex-shrink: 0; }
+  .hint-close { position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    width: 20px; height: 20px; line-height: 1; border: 0; background: none; color: #7a9c8a;
+    font-size: 18px; cursor: pointer; border-radius: 4px; }
+  .hint-close:hover { background: rgba(31,111,67,.12); color: #1f6f43; }
+  #hintText { transition: opacity .25s ease; }
+  .pv-empty { padding: 44px 20px; text-align: center; color: #aaa; font-size: 13.5px; line-height: 2; }
+  .pv-empty b { display: block; font-size: 15px; color: #999; font-weight: 600; }
+  main { flex: 1; display: flex; gap: 12px; padding: 12px 18px; min-height: 0; }
+  .pane { flex: 1; display: flex; flex-direction: column; background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); min-width: 0; }
+  .pane-head { padding: 8px 14px; font-size: 14px; font-weight: 600; color: #555; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 8px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 10px; border-bottom: 1px solid #eee; align-items: center; }
+  .toolbar button, .toolbar select { font-size: 13px; padding: 5px 9px; border: 1px solid #d9d9d9; background: #fafafa; border-radius: 4px; cursor: pointer; }
+  .toolbar button:hover { background: #e8f5ee; border-color: #1f6f43; }
+  .toolbar button.active { background: #1f6f43; color: #fff; border-color: #1f6f43; }
+  .toolbar button.primary { background: #1f6f43; color: #fff; border-color: #1f6f43; }
+  .toolbar .sep { width: 1px; height: 20px; background: #ddd; margin: 0 3px; }
+  .toolbar .swatch { width: 22px; height: 22px; border-radius: 4px; border: 1px solid #ccc; cursor: pointer; padding: 0; }
+  #editor { flex: 1; overflow-y: auto; padding: 16px; outline: none; font-size: 15px; line-height: 1.75; }
+  #editor:empty::before { content: "在这里写帖子… 微信截图后直接 Ctrl+V 粘贴图片"; color: #bbb; }
+  #editor h2 { font-size: 26px; font-weight: 700; margin: 14px 0 6px; line-height: 1.4; }
+  #editor h3 { font-size: 19px; font-weight: 600; margin: 12px 0 4px; line-height: 1.4; }
+  #editor img { max-width: 100%; border: 1px solid #eee; border-radius: 4px; margin: 4px 0; }
+  /* 图片选中 / 拖拽排序（V1.0.2） */
+  #editor img.picked { outline: 3px solid #12905A; outline-offset: 2px; }
+  #editor img.dragging { opacity: .4; }
+  #imgBar { position: fixed; z-index: 60; display: none; gap: 6px; align-items: center;
+    background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 5px 8px;
+    box-shadow: 0 3px 12px rgba(0,0,0,.14); font-size: 12px; }
+  #imgBar button { border: 1px solid #ddd; background: #fff; border-radius: 5px;
+    padding: 3px 9px; cursor: pointer; color: #444; }
+  #imgBar button:hover { background: #E8F5EE; border-color: #12905A; color: #0F7A49; }
+  #imgBar .del:hover { background: #FDEDED; border-color: #c0392b; color: #c0392b; }
+  #editor table { border-collapse: collapse; }
+  #editor td { border: 1px solid #ccc; padding: 6px 10px; min-width: 40px; }
+  #editor blockquote { border-left: 4px solid #1f6f43; background: #f6faf7; margin: 8px 0; padding: 8px 12px; color: #555; }
+  .statusbar { padding: 5px 14px; font-size: 12px; color: #999; border-top: 1px solid #eee; display: flex; gap: 16px; }
+  #preview { flex: 1; overflow-y: auto; padding: 16px; font-size: 15px; line-height: 1.75; }
+  #preview h2 { font-size: 24px; font-weight: 700; margin: 16px 0 8px; line-height: 1.4; }
+  #preview h3 { font-size: 18px; font-weight: 700; margin: 12px 0 6px; line-height: 1.4; }
+  #preview table { border-collapse: collapse; margin: 8px 0; }
+  #preview td { border: 1px solid #ccc; padding: 6px 10px; }
+  #preview .blockcode { background: #f6f6f6; border: 1px solid #ddd; border-radius: 4px; padding: 10px 12px; font-family: Consolas, "Courier New", monospace; font-size: 13px; white-space: pre-wrap; word-break: break-all; margin: 8px 0; }
+  #preview .quote { border-left: 4px solid #ccc; background: #fafafa; padding: 8px 12px; margin: 8px 0; color: #555; }
+  #preview hr { border: none; border-top: 1px solid #ddd; margin: 12px 0; }
+  #preview img { max-width: 100%; }
+  #preview p { margin: 6px 0; }
+  footer { display: flex; gap: 10px; padding: 10px 18px; background: #fff; border-top: 1px solid #e5e5e5; flex-shrink: 0; align-items: center; }
+  footer .spacer { flex: 1; }
+  .btn { font-size: 15px; padding: 10px 22px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; }
+  .btn-green { background: #1f6f43; color: #fff; }
+  .btn-green:hover { background: #185636; }
+  .btn-red { background: #d03050; color: #fff; }
+  .btn-red:hover { background: #b02640; }
+  .btn-gray { background: #eee; color: #555; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  #overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: center; justify-content: center; z-index: 99; }
+  #overlay .box { background: #fff; border-radius: 10px; padding: 26px 30px; width: 560px; max-width: 92vw; max-height: 80vh; overflow-y: auto; }
+  #overlay .box h3 { font-size: 17px; margin-bottom: 12px; }
+  #overlay .logs { font-size: 13px; font-family: Consolas, monospace; background: #f6f6f6; border-radius: 6px; padding: 12px; max-height: 220px; overflow-y: auto; white-space: pre-wrap; margin-bottom: 12px; }
+  #overlay .result { font-size: 14px; line-height: 1.8; }
+  #overlay .result a { color: #1f6f43; font-weight: 600; }
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #1f6f43; border-top-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -3px; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* 通用模态框 */
+  #modalOv { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: none; align-items: center; justify-content: center; z-index: 120; }
+  #modalOv .mbox { background: #fff; border-radius: 10px; padding: 22px 26px; width: 520px; max-width: 92vw; }
+  #modalOv .mbox h3 { font-size: 16px; margin-bottom: 14px; }
+  #modalOv .mrow { margin-bottom: 12px; }
+  #modalOv label { display: block; font-size: 13px; color: #666; margin-bottom: 4px; }
+  #modalOv input[type=text], #modalOv input[type=number], #modalOv textarea { width: 100%; font-size: 14px; padding: 8px 10px; border: 1px solid #d9d9d9; border-radius: 5px; outline: none; font-family: inherit; }
+  #modalOv textarea { min-height: 160px; font-family: Consolas, monospace; font-size: 13px; resize: vertical; }
+  #modalOv .mmsg { font-size: 14px; line-height: 1.9; white-space: pre-wrap; background: #f6f6f6; padding: 12px; border-radius: 6px; margin-bottom: 14px; }
+  #modalOv .mbtns { display: flex; justify-content: flex-end; gap: 10px; }
+  #modalOv .mbtns .btn { font-size: 14px; padding: 8px 18px; }
+  #toast { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; font-size: 14px; padding: 9px 18px; border-radius: 6px; display: none; z-index: 200; max-width: 80vw; }
+  .draftsel { font-size: 13px; padding: 6px 8px; border: none; border-radius: 5px; background: rgba(255,255,255,.16); color: #fff; cursor: pointer; max-width: 200px; }
+  .draftsel option { color: #333; }
+  /* ===== 账号柜：自绘下拉（原生 select 的弹出层是系统画的，行距没法控制，
+     用户实测间距大到离谱；自绘才能压实间距、还能自由分组）===== */
+  .acct { position: relative; }
+  .acct-btn { font-size: 13px; padding: 6px 10px; border: none; border-radius: 5px;
+    background: rgba(255,255,255,.16); color: #fff; cursor: pointer; max-width: 200px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: inherit; }
+  .acct-btn:hover { background: rgba(255,255,255,.26); }
+  .acct-menu { display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 95;
+    background: #fff; border: 1px solid #e3e3e3; border-radius: 8px;
+    box-shadow: 0 10px 28px rgba(0,0,0,.16); min-width: 196px; padding: 5px; }
+  .acct.open .acct-menu { display: block; }
+  .acct-cap { font-size: 11px; color: #9a9a9a; padding: 6px 10px 3px; user-select: none; }
+  .acct-item { display: block; width: 100%; text-align: left; font-size: 13px; padding: 6px 10px;
+    border: 0; background: none; border-radius: 5px; cursor: pointer; color: #333; font-family: inherit; }
+  .acct-item:hover { background: #eef6f1; }
+  .acct-item.cur { color: #1f6f43; font-weight: 700; }
+  .acct-item.danger { color: #c0392b; }
+  .acct-item.danger:hover { background: #fdf0ee; }
+  .acct-sep { height: 1px; background: #ececec; margin: 4px 6px; }
+  /* 登录引导门 */
+  #loginGate { position: fixed; inset: 0; background: rgba(240,242,245,.96); display: none; align-items: center; justify-content: center; z-index: 90; }
+  #loginGate .gate-card { background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,.10); padding: 40px 48px; width: 480px; max-width: 92vw; text-align: center; }
+  #loginGate h2 { font-size: 22px; color: #1f6f43; margin-bottom: 14px; }
+  #loginGate .gate-desc { font-size: 14px; color: #666; line-height: 1.9; margin-bottom: 24px; }
+  #loginGate .gate-btn { font-size: 17px; padding: 13px 44px; background: #1f6f43; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+  #loginGate .gate-btn:hover { background: #185636; }
+  #loginGate .gate-tip { font-size: 12px; color: #999; margin-top: 16px; line-height: 1.8; }
+  #loginGate .gate-waiting { display: none; }
+  #loginGate .gate-waiting .spin { display: inline-block; width: 18px; height: 18px; border: 3px solid #1f6f43; border-top-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -4px; margin-right: 8px; }
+  /* ===== 底部作者署名（方案A）===== */
+  .authorbar { flex-shrink: 0; background: #fafbfc; border-top: 1px solid #e8e8e8; text-align: center;
+    padding: 6px 14px 7px; font-size: 12px; color: #999; line-height: 1.6; }
+  .authorbar .authorlink { color: #1f6f43; font-weight: 600; text-decoration: none; position: relative; padding: 5px 2px; }
+  .authorbar .absep { margin: 0 7px; color: #ccc; }
+  .wxcard { position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(9px);
+    background: #fff; border-radius: 12px; box-shadow: 0 10px 34px rgba(0,0,0,.22); padding: 8px;
+    width: 344px; text-align: center; opacity: 0; pointer-events: none; transition: all .2s ease; z-index: 60; }
+  .authorlink:hover .wxcard, .wxcard:hover { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+  .authorlink:hover::after { content: ""; position: absolute; left: 50%; bottom: -3px; transform: translateX(-50%);
+    border: 6px solid transparent; border-top-color: #fff; filter: drop-shadow(0 -1px 1px rgba(0,0,0,.08)); }
+  /* 卡片里只放一张微信横幅图（二维码够大，手机能扫出来），别的文字都不要 */
+  .wxcard img { display: block; width: 328px; height: auto; border-radius: 8px; }
+
+  /* ===== 可拖动的反馈球（方案B）===== */
+  .fab { position: fixed; right: 22px; bottom: 104px; width: 50px; height: 50px; border-radius: 50%;
+    background: #1f6f43; color: #fff; border: none; font-size: 21px; cursor: grab; z-index: 70;
+    box-shadow: 0 6px 18px rgba(31,111,67,.42); transition: box-shadow .16s, transform .16s; user-select: none; }
+  .fab:hover { transform: scale(1.07); }
+  /* 反馈通道必须永远够得着 —— 早期 z-index(70) 被登录门(90)盖住，
+     恰恰在最需要反馈"打不开/发不了帖"的时候点不到 */
+  .fab { z-index: 150; }
+  .fab:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+  .fab.dragging { cursor: grabbing; transform: scale(1.12); box-shadow: 0 10px 26px rgba(31,111,67,.55); }
+  .fabcard { position: fixed; z-index: 71; width: 268px; background: #fff; border-radius: 12px;
+    box-shadow: 0 12px 36px rgba(0,0,0,.24); display: none; overflow: hidden; }
+  .fabcard.show { display: block; animation: fabpop .18s ease; }
+  @keyframes fabpop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .fabcard-head { background: #1f6f43; color: #fff; padding: 10px 14px; font-size: 13.5px; font-weight: 600; }
+  .fabcard-head .fabhint { display: block; font-size: 11px; font-weight: 400; opacity: .85; margin-top: 3px; }
+  .fabcard-body { padding: 12px 14px 14px; }
+  .fabbtn { display: block; width: 100%; margin-bottom: 8px; background: #1f6f43; color: #fff; border: none;
+    border-radius: 8px; padding: 9px 0; font-size: 13px; cursor: pointer; text-decoration: none; text-align: center; }
+  .fabbtn:hover { filter: brightness(1.09); }
+  .fabbtn.ghost { background: #eef4f1; color: #1f6f43; }
+  .fabbtn:last-of-type { margin-bottom: 10px; }
+  .fabnote { font-size: 11px; color: #888; line-height: 1.7; }
+  .fabnote b { color: #1f6f43; }
+  #loginGate .gate-cancel { font-size: 13px; color: #888; background: none; border: none; text-decoration: underline; cursor: pointer; margin-top: 14px; }
+  #loginGate .gate-ok { color: #1f6f43; font-size: 18px; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>绿联社区 · 发帖工作台 <span id="verTag" title="点击查看版本信息" style="font-size:11px;font-weight:400;opacity:.75;cursor:pointer;vertical-align:middle;"></span></h1>
+  <span class="status" id="loginStatus" title="点击重新检查登录状态">检查登录状态…</span>
+  <div class="acct" id="acct" title="账号柜：切换发帖身份 / 登录另一个账号 / 重新登录 / 移除账号（不同账号在各版块权限不同，切换后会自动重扫）">
+    <button type="button" class="acct-btn" id="acctBtn"></button>
+    <div class="acct-menu" id="acctMenu"></div>
+  </div>
+  <select class="draftsel" id="draftSel" title="切换草稿"></select>
+  <div class="spacer"></div>
+  <button class="hbtn" onclick="selfCheck()" title="检查绿联官方发帖页结构是否变了（官方改版后用它定位）">🩺 体检</button>
+  <button class="hbtn" onclick="refreshBoards(true)" title="重新扫描各版块发帖权限">🔄 刷新版块</button>
+  <button class="hbtn" onclick="openPosts()" title="发过的帖子都记在这里，可一键载入再发一次">📝 发布记录</button>
+  <button class="hbtn" onclick="openSnippets()" title="常用段落（开头结尾、设备信息表、免责声明）一键插入">📚 片段库</button>
+  <div style="position:relative;display:inline-block;">
+    <button class="hbtn" onclick="toggleMenu('importMenu', this)" title="从文件导入稿件">📥 导入 ▾</button>
+    <div id="importMenu" class="hmenu" style="display:none;">
+      <button onclick="hideMenus(); document.getElementById('importMd').click()">📄 Markdown（配图一起选）</button>
+      <button onclick="hideMenus(); document.getElementById('importHtml').click()">🌐 HTML 文件</button>
+    </div>
+  </div>
+  <div style="position:relative;display:inline-block;">
+    <button class="hbtn" onclick="toggleMenu('exportMenu', this)" title="把当前稿件存成文件">💾 导出 ▾</button>
+    <div id="exportMenu" class="hmenu" style="display:none;">
+      <button onclick="hideMenus(); exportMd()">📄 Markdown</button>
+      <button onclick="hideMenus(); exportHtml()">🌐 HTML（图片内嵌，可粘回论坛）</button>
+    </div>
+  </div>
+  <input type="file" id="importMd" accept=".md,.markdown,.txt,image/*" multiple style="display:none">
+  <input type="file" id="importHtml" accept=".html,.htm" style="display:none">
+</header>
+
+<div class="loginbanner" id="loginBanner">
+  <b>还没有登录</b> — 请完成登录后再发帖（登录入口会自动弹出；如已关闭，点上方「未登录」重新打开）。
+</div>
+
+<div class="titlebar">
+  <input id="postTitle" maxlength="80" placeholder="帖子标题（40 字以内，切换标题会自动保存/切换草稿）">
+  <span class="tcount" id="titleCount" title="论坛建议标题 40 字以内，超了会被截断">0/40</span>
+  <select id="postBoard" title="选择版块（不同账号权限不同，✗=当前账号没权限）">
+    <option value="">版块加载中…</option>
+  </select>
+  <select id="postCat" disabled title="主题分类（先选版块，分类随版块联动；不选也能发）">
+    <option value="">主题分类（可不选）</option>
+  </select>
+</div>
+
+<div id="imgBar">
+  <span style="color:#888;">图片</span>
+  <button type="button" id="imgUp" title="上移">↑ 上移</button>
+  <button type="button" id="imgDown" title="下移">↓ 下移</button>
+  <button type="button" id="imgDel" class="del" title="删除这张图">🗑 删除</button>
+</div>
+<div class="hint" id="hintBar">
+  <span id="hintText">💡 截图可直接在本编辑器中粘贴（按 <b>Ctrl+V</b>），图片自动插入（一次粘多张也行）。也可以把图片文件拖进编辑区。</span>
+  <button class="hint-close" id="hintClose" title="不再显示这条提示">×</button>
+</div>
+
+<main>
+  <section class="pane">
+    <div class="pane-head">✏️ 编辑</div>
+    <div class="toolbar">
+      <button onclick="cmd('bold')" title="加粗"><b>B</b></button>
+      <button onclick="cmd('italic')" title="斜体"><i>I</i></button>
+      <button onclick="cmd('underline')" title="下划线"><u>U</u></button>
+      <span class="sep"></span>
+      <button onclick="setBlock('h2')">大标题</button>
+      <button onclick="setBlock('h3')">小标题</button>
+      <button onclick="setBlock('p')">正文</button>
+      <span class="sep"></span>
+      <select onchange="setFont(this.value); this.selectedIndex=0;" title="选中文字的字号（发到论坛不会变形）">
+        <option value="">字号</option>
+        <option value="2">特小</option>
+        <option value="3">小</option>
+        <option value="5">大</option>
+        <option value="6">特大</option>
+      </select>
+      <button onclick="toggleIndent()" title="段落首行缩进两格（再点一次取消）">缩进</button>
+      <button onclick="clearFormat()" title="清除选中文字的加粗/颜色/字号等样式">清除格式</button>
+      <span class="sep"></span>
+      <button onclick="cmd('insertUnorderedList')" title="项目符号">• 列表</button>
+      <button onclick="cmd('insertOrderedList')" title="编号列表">1. 列表</button>
+      <span class="sep"></span>
+      <button onclick="insertQuote()" title="选中文字后点我">❝ 引用</button>
+      <button onclick="insertCode()" title="插入代码块">&lt;/&gt; 代码</button>
+      <button onclick="insertTable()" title="插入表格">▦ 表格</button>
+      <button onclick="insertLink()" title="插入链接">🔗 链接</button>
+      <button onclick="cmd('insertHorizontalRule')" title="分割线">— 分割线</button>
+      <span class="sep"></span>
+      <button class="swatch" style="background:#d03050" onclick="foreColor('#d03050')" title="红色"></button>
+      <button class="swatch" style="background:#1f6f43" onclick="foreColor('#1f6f43')" title="绿色"></button>
+      <button class="swatch" style="background:#1565c0" onclick="foreColor('#1565c0')" title="蓝色"></button>
+      <button class="swatch" style="background:#e67e22" onclick="foreColor('#e67e22')" title="橙色"></button>
+      <button class="swatch" style="background:#333333" onclick="foreColor('#333333')" title="黑色"></button>
+      <span class="sep"></span>
+      <button onclick="pickFile()" class="primary">🖼 插入图片</button>
+    </div>
+    <div id="editor" contenteditable="true" spellcheck="false"></div>
+    <div class="statusbar"><span id="wordCount">字数 0</span><span id="imgCount">图片 0</span><span id="blockState"></span><span id="draftState"></span></div>
+  </section>
+
+  <section class="pane">
+    <div class="pane-head">👁 实时预览 <span style="font-weight:400;color:#999;font-size:12px">（发布后的效果）</span></div>
+    <div id="preview"></div>
+  </section>
+</main>
+
+<footer>
+  <button class="btn btn-gray" onclick="clearAll()">清空</button>
+  <button class="btn btn-gray" onclick="saveDraft(true)">保存草稿</button>
+  <div class="spacer"></div>
+  <button class="btn btn-green" id="btnFill" onclick="publish(false)">填入论坛编辑器（不发布）</button>
+  <button class="btn btn-red" id="btnPub" onclick="publish(true)">直接发布 🚀</button>
+</footer>
+
+<!-- 作者署名：鼠标停在上面会弹出微信名片 -->
+<div class="authorbar">
+  作者：<a class="authorlink" href="https://github.com/gulugulupao" target="_blank" rel="noopener">很多问题的小明同学
+    <span class="wxcard">
+      <img src="/wechat-qr.png" alt="微信搜一搜：很多问题的小明同学">
+    </span>
+  </a>
+  <span class="absep">·</span>
+  <span>发帖出问题？点右下角的球，下载诊断包发给作者</span>
+</div>
+
+<!-- 反馈球：可拖动，拖动时不会误触发点击 -->
+<button class="fab" id="fab" title="反馈 bug：点一下下载诊断包（可拖动位置）">💬</button>
+<div class="fabcard" id="fabCard">
+  <div class="fabcard-head">反馈 bug<span class="fabhint">把诊断包发给作者，定位快得多</span></div>
+  <div class="fabcard-body">
+    <button class="fabbtn" onclick="doDiagZip(event)">📦 下载诊断包（.zip）</button>
+    <a class="fabbtn ghost" href="https://github.com/gulugulupao" target="_blank" rel="noopener">GitHub：github.com/gulugulupao</a>
+    <div class="fabnote">包里只有环境检测 / 发帖页体检 / 版块权限三项，<b>不含</b>账号密码、登录凭证、昵称和你的草稿内容。</div>
+  </div>
+</div>
+
+<div id="overlay"><div class="box">
+  <h3 id="ovTitle">正在处理…</h3>
+  <div class="logs" id="ovLogs"></div>
+  <div class="result" id="ovResult"></div>
+  <div style="text-align:right;margin-top:14px"><button class="btn btn-gray" onclick="closeOverlay()" id="ovClose" style="display:none">关闭</button></div>
+</div></div>
+
+<div id="modalOv"><div class="mbox">
+  <h3 id="mdTitle"></h3>
+  <div id="mdBody"></div>
+  <div class="mbtns">
+    <button class="btn btn-gray" id="mdCancel">取消</button>
+    <button class="btn btn-green" id="mdOk">确定</button>
+  </div>
+</div></div>
+
+<div id="toast"></div>
+<input type="file" id="filePicker" accept="image/*" multiple style="display:none">
+
+<div id="loginGate"><div class="gate-card">
+  <h2>欢迎使用绿联发帖工作台</h2>
+  <div class="gate-desc">发帖前需要登录<strong>你自己的</strong>绿联社区账号。<br>账号密码只传给了绿联官网，登录凭证只保存在你自己电脑上，不会上传到任何地方。</div>
+  <div id="gateIdle">
+    <button class="gate-btn" onclick="startLogin(hasAnyAccount ? (currentAccount || '__default__') : '')">登录我的绿联账号</button>
+    <div class="gate-tip">点击后会弹出绿联官方登录窗口，在窗口里输入账号密码即可<br>如果账号开了短信验证，在弹出窗口里收验证码填进去</div>
+  </div>
+  <div class="gate-waiting" id="gateWaiting">
+    <p style="font-size:15px"><span class="spin"></span>登录窗口已弹出，请在窗口里完成登录…</p>
+    <p style="font-size:12px;color:#999;margin-top:8px">登录成功后这里会自动跳转，无需其他操作</p>
+    <button class="gate-cancel" onclick="cancelLogin()">取消登录</button>
+  </div>
+  <div class="gate-waiting" id="gateDone">
+    <p class="gate-ok">登录成功，正在进入工作台…</p>
+  </div>
+</div></div>
+
+<script>
+const editor = document.getElementById('editor');
+const preview = document.getElementById('preview');
+const titleInput = document.getElementById('postTitle');
+const catSelect = document.getElementById('postCat');
+const DRAFT_PREFIX = 'ugreen_draft_';
+const DRAFT_INDEX = 'ugreen_draft_index';
+
+// ---------- 提示 ----------
+let toastTimer = null;
+function toast(msg, ms = 2600) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.style.display = 'none', ms);
+}
+
+// ---------- 通用模态框 ----------
+function modal(opts) {
+  // opts: {title, msg?, fields?:[{key,label,type,value,placeholder}], okText?, danger?}
+  return new Promise(resolve => {
+    const ov = document.getElementById('modalOv');
+    document.getElementById('mdTitle').textContent = opts.title || '提示';
+    const body = document.getElementById('mdBody');
+    body.innerHTML = '';
+    if (opts.msg) {
+      const d = document.createElement('div');
+      d.className = 'mmsg'; d.textContent = opts.msg;
+      body.appendChild(d);
+    }
+    const inputs = {};
+    (opts.fields || []).forEach(f => {
+      const row = document.createElement('div'); row.className = 'mrow';
+      // checkbox：整行是一个可选的勾选项（label 包住 input），不抢焦点
+      if (f.type === 'checkbox') {
+        const lb = document.createElement('label');
+        lb.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400;color:#555;';
+        const el = document.createElement('input');
+        el.type = 'checkbox'; el.checked = !!f.value; el.style.width = '16px'; el.style.height = '16px';
+        lb.appendChild(el);
+        lb.appendChild(document.createTextNode(f.label || ''));
+        row.appendChild(lb); body.appendChild(row);
+        inputs[f.key] = el;
+        return;
+      }
+      const lb = document.createElement('label'); lb.textContent = f.label || '';
+      row.appendChild(lb);
+      let el;
+      if (f.type === 'textarea') { el = document.createElement('textarea'); el.rows = f.rows || 8; }
+      else { el = document.createElement('input'); el.type = f.type || 'text'; }
+      el.value = f.value || ''; el.placeholder = f.placeholder || '';
+      row.appendChild(el); body.appendChild(row);
+      inputs[f.key] = el;
+      if (f.focus !== false) setTimeout(() => el.focus(), 50);
+    });
+    const okBtn = document.getElementById('mdOk');
+    okBtn.textContent = opts.okText || '确定';
+    okBtn.className = 'btn ' + (opts.danger ? 'btn-red' : 'btn-green');
+    const cancelBtn = document.getElementById('mdCancel');
+    // 额外操作按钮（降级模式用）：actions: [{text, cls, fn(close)}]，放在 确定/取消 中间
+    (opts.actions || []).forEach(a => {
+      const b = document.createElement('button');
+      b.className = 'btn ' + (a.cls || 'btn-gray');
+      b.dataset.extra = '1';
+      b.textContent = a.text;
+      b.onclick = () => { try { a.fn(() => cleanup(opts.fields ? null : false)); } catch (e) { console.error(e); } };
+      cancelBtn.parentNode.insertBefore(b, cancelBtn);
+    });
+    // 关掉后把焦点还给触发它的元素（不然键盘用户按完确定焦点就掉到 body 了）
+    const prevActive = document.activeElement;
+    const onKey = e => { if (e.key === 'Escape') cancelBtn.click(); };
+    document.addEventListener('keydown', onKey);
+    const cleanup = (val) => {
+      ov.style.display = 'none';
+      document.removeEventListener('keydown', onKey);
+      okBtn.onclick = null; cancelBtn.onclick = null;
+      // 额外按钮是动态插入的，关弹窗时要撤掉，否则下次弹窗会越堆越多
+      ov.querySelectorAll('[data-extra="1"]').forEach(b => b.remove());
+      try { if (prevActive && prevActive.focus) prevActive.focus(); } catch (e) {}
+      resolve(val);
+    };
+    okBtn.onclick = () => {
+      if (opts.fields) {
+        const out = {};
+        for (const k in inputs) out[k] = (inputs[k].type === 'checkbox') ? inputs[k].checked : inputs[k].value;
+        if (opts.require && !String(out[opts.require] || '').trim()) { inputs[opts.require].focus(); return; }
+        cleanup(out);
+      } else cleanup(true);
+    };
+    cancelBtn.onclick = () => cleanup(opts.fields ? null : false);
+    ov.style.display = 'flex';
+    if (opts.fields) {
+      const first = Object.values(inputs)[0];
+      if (first) { first.onkeydown = e => { if (e.key === 'Enter' && first.tagName !== 'TEXTAREA') okBtn.click(); }; }
+    }
+  });
+}
+
+// ---------- 工具栏命令 ----------
+function cmd(c) {
+  editor.focus(); document.execCommand(c, false, null);
+  if (c === 'insertHorizontalRule') editor.querySelectorAll('hr').forEach(h => h.removeAttribute('id'));
+  onEdit(); updateToolbarState();
+}
+function setBlock(tag) { editor.focus(); document.execCommand('formatBlock', false, '<' + tag + '>'); onEdit(); updateToolbarState(); }
+// 字号（V1.3.0）：Discuz 编辑器认 <font size="1-7">，发出去不会变形。
+// 2=特小 3=小 5=大 6=特大（4 与默认视觉接近，就不放了，免得选项太多）
+function setFont(n) {
+  if (!n) return;
+  editor.focus();
+  document.execCommand('fontSize', false, n);
+  onEdit(); updateToolbarState();
+}
+// 首行缩进：对光标所在段落切 text-indent:2em（中文帖惯例）
+function toggleIndent() {
+  editor.focus();
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  let node = sel.getRangeAt(0).startContainer;
+  if (node.nodeType === 3) node = node.parentNode;
+  const block = node.closest && node.closest('p,div,li');
+  if (!block || !editor.contains(block)) { toast('先把光标放进要缩进的段落里'); return; }
+  block.style.textIndent = block.style.textIndent === '2em' ? '' : '2em';
+  onEdit(); updatePreview();
+}
+// 清除格式：removeFormat 洗掉加粗/斜体/颜色/字号，顺带把 font 标签清干净
+function clearFormat() {
+  editor.focus();
+  document.execCommand('removeFormat', false, null);
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount) {
+    const r = sel.getRangeAt(0);
+    const frag = r.cloneContents();
+    if (frag.querySelector && frag.querySelector('font')) {
+      const wrap = document.createElement('div');
+      wrap.appendChild(r.cloneContents());
+      wrap.querySelectorAll('font').forEach(f => { const s = document.createTextNode(f.textContent); f.replaceWith(s); });
+      r.deleteContents(); r.insertNode(wrap);
+    }
+  }
+  onEdit(); updatePreview();
+}
+function foreColor(c) { editor.focus(); document.execCommand('foreColor', false, c); onEdit(); }
+function escHtml(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+// ---------- 选区保存/恢复(模态框会抢焦点, 必须保存) ----------
+function saveSelection() {
+  const sel = window.getSelection();
+  if (sel.rangeCount > 0 && editor.contains(sel.anchorNode)) return sel.getRangeAt(0).cloneRange();
+  return null;
+}
+function restoreSelection(range) {
+  editor.focus();
+  if (range) {
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+}
+
+// ---------- 标记点插入(模态框安全): 弹窗前插隐形标记, 关闭后按标记替换 ----------
+const MARKER = '\u200B__WB_MARK__';
+function placeMarker() {
+  const range = saveSelection();
+  const marker = document.createTextNode(MARKER);
+  if (range) { range.deleteContents(); range.insertNode(marker); }
+  else { editor.appendChild(marker); }
+}
+function replaceMarkerWith(html) {
+  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    const idx = node.nodeValue.indexOf(MARKER);
+    if (idx !== -1) {
+      const range = document.createRange();
+      range.setStart(node, idx);
+      range.setEnd(node, idx + MARKER.length);
+      range.deleteContents();
+      const frag = range.createContextualFragment(html);
+      range.insertNode(frag);
+      // 光标移到插入内容之后
+      const last = frag.lastChild || node;
+      const after = document.createRange();
+      after.setStartAfter(last); after.collapse(true);
+      const sel = window.getSelection();
+      sel.removeAllRanges(); sel.addRange(after);
+      return true;
+    }
+  }
+  return false;
+}
+
+// ---------- 按钮激活状态(B/I/U/列表 开着就高亮, 防止格式粘连困惑) ----------
+function updateToolbarState() {
+  const map = { 'bold': 'bold', 'italic': 'italic', 'underline': 'underline', 'insertUnorderedList': 'ul', 'insertOrderedList': 'ol' };
+  const btns = Array.from(document.querySelectorAll('.toolbar button'));
+  btns.forEach(b => b.classList.remove('active'));
+  for (const [cmdName] of Object.entries(map)) {
+    try {
+      if (document.queryCommandState(cmdName)) {
+        const btn = btns.find(b => b.getAttribute('onclick') === "cmd('" + cmdName + "')");
+        if (btn) btn.classList.add('active');
+      }
+    } catch (e) {}
+  }
+  // 当前块格式显示在状态栏
+  try {
+    const sel = window.getSelection();
+    let block = '正文';
+    if (sel.rangeCount && editor.contains(sel.anchorNode)) {
+      let node = sel.anchorNode;
+      if (node.nodeType === 3) node = node.parentElement;
+      while (node && node !== editor) {
+        const t = node.tagName;
+        if (t === 'H2') { block = '大标题'; break; }
+        if (t === 'H3') { block = '小标题'; break; }
+        if (t === 'BLOCKQUOTE' && node.parentElement.classList.contains('blockcode')) { block = '代码块'; break; }
+        if (t === 'BLOCKQUOTE' && node.parentElement.classList.contains('quote')) { block = '引用'; break; }
+        if (t === 'LI') { block = '列表'; break; }
+        if (t === 'P' || t === 'DIV') { block = '正文'; break; }
+        node = node.parentElement;
+      }
+    }
+    const bs = document.getElementById('blockState');
+    if (bs) bs.textContent = '当前格式: ' + block;
+  } catch (e) {}
+}
+// 按住方向键移光标时 selectionchange 是按帧触发的，早期每次都全量查 DOM +
+// 跑 5 次 queryCommandState —— 用 rAF 合并掉重复调用
+let selRaf = 0;
+document.addEventListener('selectionchange', () => {
+  if (selRaf) return;
+  selRaf = requestAnimationFrame(() => {
+    selRaf = 0;
+    const sel = window.getSelection();
+    if (sel.rangeCount && editor.contains(sel.anchorNode)) updateToolbarState();
+  });
+});
+
+async function insertQuote() {
+  const text = window.getSelection().toString();
+  if (!text) { toast('先选中要引用的文字，再点引用'); return; }
+  placeMarker();
+  const html = '<div class="quote"><blockquote>' + escHtml(text).replace(/\n/g, '<br>') + '</blockquote></div>';
+  if (!replaceMarkerWith(html)) {
+    // marker 丢了就撤销选中内容直接插(兜底)
+    editor.focus();
+    document.execCommand('insertHTML', false, html);
+  }
+  onEdit();
+}
+async function insertCode() {
+  placeMarker();
+  const r = await modal({ title: '插入代码块', fields: [{ key: 'code', label: '代码（支持多行）:', type: 'textarea', placeholder: '粘贴或输入代码…' }] });
+  if (!r || !r.code.trim()) { removeMarker(); return; }
+  const html = '<div class="blockcode"><blockquote>' + escHtml(r.code).replace(/\n/g, '<br>') + '</blockquote></div>';
+  if (!replaceMarkerWith(html)) { editor.focus(); document.execCommand('insertHTML', false, html); }
+  onEdit();
+}
+async function insertTable() {
+  placeMarker();
+  const r = await modal({ title: '插入表格', fields: [
+    { key: 'rows', label: '行数:', type: 'number', value: '3' },
+    { key: 'cols', label: '列数:', type: 'number', value: '3' },
+  ]});
+  if (!r) { removeMarker(); return; }
+  const rows = Math.max(1, Math.min(20, parseInt(r.rows) || 3));
+  const cols = Math.max(1, Math.min(10, parseInt(r.cols) || 3));
+  let t = '<table><tbody>';
+  for (let i = 0; i < rows; i++) { t += '<tr>'; for (let j = 0; j < cols; j++) t += '<td>&nbsp;</td>'; t += '</tr>'; }
+  t += '</tbody></table><p><br></p>';
+  if (!replaceMarkerWith(t)) { editor.focus(); document.execCommand('insertHTML', false, t); }
+  onEdit();
+}
+async function insertLink() {
+  const sel = window.getSelection().toString();
+  placeMarker();
+  const r = await modal({ title: '插入链接', fields: [{ key: 'url', label: '链接地址:', type: 'text', placeholder: 'https://example.com' }], require: 'url' });
+  if (!r || !r.url.trim()) { removeMarker(); return; }
+  // 协议白名单：不拦的话 javascript:alert(...) 也能做成链接 —— 预览区是原样渲染
+  // editor.innerHTML 的，点一下就在本地页面里执行了，还会原样发到论坛
+  let url = r.url.trim();
+  if (!/^(https?:\/\/|\/|#|mailto:)/i.test(url)) {
+    if (/^[a-z][a-z0-9+.-]*:/i.test(url)) { toast('这个链接协议不被允许（只支持 http/https）', 4000); removeMarker(); return; }
+    url = 'https://' + url;   // 用户只写了 example.com 就帮他补全
+  }
+  const html = sel
+    ? '<a href="' + escHtml(url) + '">' + escHtml(sel) + '</a>'
+    : '<a href="' + escHtml(url) + '">' + escHtml(url) + '</a>';
+  if (!replaceMarkerWith(html)) { editor.focus(); document.execCommand('createLink', false, r.url.trim()); }
+  onEdit();
+}
+function removeMarker() {
+  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    const idx = node.nodeValue.indexOf(MARKER);
+    if (idx !== -1) {
+      node.nodeValue = node.nodeValue.replace(MARKER, '');
+      return;
+    }
+  }
+}
+function pickFile() { document.getElementById('filePicker').click(); }
+document.getElementById('filePicker').addEventListener('change', async function () {
+  for (const f of this.files) await uploadAndInsert(f);
+  this.value = '';
+});
+
+// ---------- 图片: 压缩 / 上传 / 插入 ----------
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = reject;
+    i.src = src;
+  });
+}
+// 大图缩到 1600px 宽以内(保持PNG无损, 体积通常降 70%+), 小图原样
+async function maybeCompress(file) {
+  if (file.size < 600 * 1024) return file;
+  try {
+    const dataUrl = await fileToDataUrl(file);
+    const img = await loadImage(dataUrl);
+    const MAXW = 1600;
+    if (img.width <= MAXW) return file;
+    const scale = MAXW / img.width;
+    const canvas = document.createElement('canvas');
+    canvas.width = MAXW; canvas.height = Math.round(img.height * scale);
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise(r => canvas.toBlob(r, file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png'));
+    if (!blob || blob.size >= file.size) return file;
+    console.log('图片已压缩:', Math.round(file.size / 1024) + 'KB ->', Math.round(blob.size / 1024) + 'KB');
+    return new File([blob], file.name, { type: blob.type });
+  } catch (e) { return file; }
+}
+async function uploadImage(file) {
+  const f = await maybeCompress(file);
+  const dataUrl = await fileToDataUrl(f);
+  const res = await fetch('/api/image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dataUrl }) });
+  return res.json();
+}
+async function uploadAndInsert(file) {
+  if (!file.type.startsWith('image/')) { toast('只支持图片文件'); return; }
+  placeMarker();
+  try {
+    const j = await uploadImage(file);
+    if (!j.ok) { removeMarker(); toast('图片上传失败: ' + j.error); return; }
+    if (!replaceMarkerWith('<img src="' + j.url + '" alt="插图">')) {
+      insertImageAtCursor(j.url);
+    }
+    updateCounts();
+    onEdit();
+    return j.url;
+  } catch (e) { removeMarker(); toast('图片上传出错: ' + e.message); }
+}
+function insertImageAtCursor(url) {
+  editor.focus();
+  const sel = window.getSelection();
+  const img = document.createElement('img');
+  img.src = url; img.alt = '插图';
+  if (sel.rangeCount && editor.contains(sel.anchorNode)) {
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+    range.insertNode(img);
+    const after = document.createRange();
+    after.setStartAfter(img); after.collapse(true);
+    sel.removeAllRanges(); sel.addRange(after);
+  } else {
+    const p = document.createElement('p');
+    p.appendChild(img);
+    editor.appendChild(p);
+  }
+}
+
+// ---------- 粘贴: 微信截图(多图) + 外部内容清理 ----------
+function cleanPastedHtml(html) {
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    doc.querySelectorAll('script,style,meta,link,title,xml,o:p,iframe').forEach(n => n.remove());
+    doc.querySelectorAll('*').forEach(el => {
+      Array.from(el.attributes).forEach(a => {
+        const n = a.name.toLowerCase();
+        const keep =
+          (n === 'href' && el.tagName === 'A') ||
+          (n === 'src' && el.tagName === 'IMG') ||
+          (n === 'alt' && el.tagName === 'IMG') ||
+          (n === 'colspan' || n === 'rowspan') ||
+          (n === 'width' || n === 'height');
+        if (!keep) el.removeAttribute(a.name);
+      });
+      const st = el.getAttribute && el.getAttribute('style');
+      if (st) {
+        const keepDecl = [];
+        st.split(';').forEach(d => {
+          const m = d.match(/^\s*(color|font-size|font-weight|font-style|text-decoration|text-align|background-color)\s*:\s*([^;]+)/i);
+          if (m) keepDecl.push(m[1].toLowerCase() + ':' + m[2].trim());
+        });
+        if (keepDecl.length) el.setAttribute('style', keepDecl.join(';'));
+        else el.removeAttribute('style');
+      }
+    });
+    // 粘贴进来的链接同样只放行 http/https 与站内相对路径
+    doc.querySelectorAll('a[href]').forEach(a => {
+      const h = (a.getAttribute('href') || '').trim();
+      if (!/^(https?:\/\/|\/|#|mailto:)/i.test(h)) a.removeAttribute('href');
+    });
+    return doc.body.innerHTML;
+  } catch (e) { return html; }
+}
+editor.addEventListener('paste', async function (e) {
+  const cd = e.clipboardData;
+  // 1. 图片(微信截图)路径: 支持一次多张
+  const imgItems = [];
+  if (cd && cd.items) { for (const it of cd.items) { if (it.type && it.type.indexOf('image/') === 0) imgItems.push(it); } }
+  if (imgItems.length) {
+    e.preventDefault();
+    placeMarker(); // 在光标位置放标记, 多图顺序插入
+    let okCount = 0;
+    for (const it of imgItems) {
+      const file = it.getAsFile();
+      if (!file) continue;
+      try {
+        const j = await uploadImage(file);
+        if (!j.ok) continue;
+        if (okCount === 0) {
+          // 第一张替换掉初始标记
+          if (!replaceMarkerWith('<img src="' + j.url + '" alt="插图">')) { insertImageAtCursor(j.url); }
+        } else {
+          // 后续图片: 在上一个图的标记法之后继续
+          const html = '<img src="' + j.url + '" alt="插图">';
+          if (!replaceMarkerWith(html)) insertImageAtCursor(j.url);
+        }
+        okCount++;
+        placeMarker(); // 为下一张准备新标记
+      } catch (err) {}
+    }
+    removeMarker(); // 清掉最后一个多余标记
+    if (okCount) { toast('已插入 ' + okCount + ' 张图 ✓'); updateCounts(); onEdit(); }
+    else toast('图片插入失败');
+    return;
+  }
+  // 2. 非图片粘贴: 清理垃圾样式后插入
+  const html = cd && cd.getData('text/html');
+  const text = cd && cd.getData('text/plain');
+  if (html || text) {
+    e.preventDefault();
+    if (html && html.trim()) document.execCommand('insertHTML', false, cleanPastedHtml(html));
+    else document.execCommand('insertText', false, text);
+    onEdit();
+  }
+});
+// 拖拽
+editor.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+editor.addEventListener('drop', async function (e) {
+  // 必须先无条件阻止默认行为：拖进来的不是图片（txt/zip/文件夹）时，
+  // 浏览器默认会用这个文件替换当前页面 —— 正在写的内容整个被冲掉
+  e.preventDefault();
+  e.stopPropagation();
+  const files = e.dataTransfer && e.dataTransfer.files;
+  if (!files || !files.length) return;
+  const imgs = Array.from(files).filter(f => f.type.indexOf('image/') === 0);
+  if (!imgs.length) { toast('只支持拖入图片文件（png / jpg / gif）', 3500); return; }
+  for (const f of imgs) await uploadAndInsert(f);
+});
+
+// ---------- 预览 / 计数 ----------
+function updatePreview() {
+  const html = editor.innerHTML;
+  if (!html || !html.trim() || html === '<br>' || html === '<div><br></div>') {
+    // 第一次打开时右边一整片空白，没人知道那块是干嘛的 —— 给个空状态引导
+    preview.innerHTML = '<div class="pv-empty"><b>在左边写，这里实时预览</b>'
+      + '右边看到的就是发到论坛后的真实排版效果<br>'
+      + '支持：加粗 / 标题 / 列表 / 引用 / 代码块 / 表格 / 彩色文字 / 图片</div>';
+    return;
+  }
+  // 保留预览的滚动位置：每敲一个字就整体重建 DOM，会把预览弹回顶部，
+  // 想对照着看排版根本没法边写边看
+  const top = preview.scrollTop;
+  preview.innerHTML = html;
+  preview.scrollTop = top;
+}
+// 论坛标题建议 40 字以内，实时显示字数，超了标黄
+function updateTitleCount() {
+  const el = document.getElementById('titleCount');
+  if (!el) return;
+  const n = (document.getElementById('postTitle').value || '').length;
+  el.textContent = n + '/40';
+  el.className = 'tcount' + (n > 40 ? ' warn' : '');
+}
+function updateCounts() {
+  const text = editor.innerText.replace(/\s/g, '');
+  document.getElementById('wordCount').textContent = '字数 ' + text.length;
+  document.getElementById('imgCount').textContent = '图片 ' + editor.querySelectorAll('img').length;
+}
+
+// ---------- 草稿(按标题多份) ----------
+function draftKey(title) { return DRAFT_PREFIX + (title.trim() || 'untitled'); }
+function draftIndex() {
+  try { return JSON.parse(localStorage.getItem(DRAFT_INDEX) || '[]'); } catch (e) { return []; }
+}
+function saveDraftToIndex(title) {
+  const list = draftIndex().filter(d => d.title !== title);
+  list.unshift({ title, savedAt: new Date().toISOString() });
+  localStorage.setItem(DRAFT_INDEX, JSON.stringify(list.slice(0, 30)));
+}
+let lastTitle = '';
+// 空壳草稿（没标题也没内容时触发了保存）只会在下拉里留下"该草稿是空的"的迷惑项，
+// 这种一律不算草稿
+function draftHasContent(title) {
+  try {
+    const d = JSON.parse(localStorage.getItem(draftKey(title)) || 'null');
+    if (!d || !d.html) return false;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = d.html;
+    return !!tmp.querySelector('img') || !!tmp.textContent.trim();
+  } catch (e) { return false; }
+}
+function saveDraft(manual) {
+  const title = titleInput.value.trim();
+  // 空壳不存：没标题也没内容（连图都没有）时别污染草稿列表
+  if (!title && !editor.innerHTML.trim() && !editor.querySelector('img')) {
+    if (manual) toast('编辑区是空的，没东西可保存');
+    return;
+  }
+  const key = draftKey(title);
+  const d = { title, html: editor.innerHTML, cat: catSelect.value, savedAt: new Date().toISOString() };
+  // 配额写满 / 隐私模式会抛 QuotaExceededError —— 早期没兜底，保存链路直接断在
+  // 半路，界面却还显示上一次的"已保存 xx:xx"，用户以为存好了其实没存
+  try {
+    localStorage.setItem(key, JSON.stringify(d));
+    saveDraftToIndex(title || 'untitled');
+  } catch (err) {
+    document.getElementById('draftState').textContent = '保存失败（本机存储空间不足）';
+    toast('草稿保存失败：本机存储已满，请先删掉几份旧草稿', 5000);
+    return;
+  }
+  lastTitle = title;
+  refreshDraftSel();
+  fetch('/api/draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) }).catch(() => {});
+  document.getElementById('draftState').textContent = '已保存 ' + new Date().toLocaleTimeString();
+  if (manual) toast('草稿已保存');
+}
+function loadDraftByTitle(title) {
+  const key = draftKey(title);
+  try {
+    const d = JSON.parse(localStorage.getItem(key) || 'null');
+    if (d && d.html) {
+      titleInput.value = d.title || '';
+      if (d.cat) catSelect.value = d.cat;
+      editor.innerHTML = d.html;
+      updatePreview(); updateCounts(); updateTitleCount();
+      // 必须同步 lastTitle：不同步的话，加载完立刻改标题时 oldTitle 还是上一篇，
+      // 两篇草稿的内容会串在一起
+      lastTitle = d.title || '';
+      document.getElementById('draftState').textContent = '已加载草稿(' + new Date(d.savedAt).toLocaleString() + ')';
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+function refreshDraftSel() {
+  const sel = document.getElementById('draftSel');
+  const cur = titleInput.value.trim() || 'untitled';
+  // 只列有实际内容的草稿；顺手把历史空壳从索引和存储里清掉。
+  // 没有任何真草稿时整个下拉隐藏 —— 平时直接写新帖，界面上不该出现"草稿"。
+  const raw = draftIndex();
+  const list = raw.filter(d => {
+    if (draftHasContent(d.title)) return true;
+    try { localStorage.removeItem(draftKey(d.title)); } catch (e) {}
+    return false;
+  });
+  // 清理结果回写索引，死条目别一直留着
+  if (list.length !== raw.length) {
+    try { localStorage.setItem(DRAFT_INDEX, JSON.stringify(list.slice(0, 30))); } catch (e) {}
+  }
+  if (!list.length) {
+    sel.style.display = 'none';
+    sel.innerHTML = '';
+    return;
+  }
+  sel.style.display = '';
+  sel.innerHTML = '<option value="">📁 草稿（当前：' + escHtml(cur.slice(0, 14)) + '）</option>';
+  list.forEach(d => {
+    const o = document.createElement('option');
+    o.value = d.title;
+    o.textContent = (d.title === cur ? '✓ ' : '') + d.title.slice(0, 18) + ' · ' + new Date(d.savedAt).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    sel.appendChild(o);
+  });
+}
+document.getElementById('draftSel').addEventListener('change', async function () {
+  const t = this.value;
+  if (!t) return;
+  if (editor.innerHTML.trim() && titleInput.value.trim() !== t) {
+    const ok = await modal({ title: '切换草稿', msg: '当前编辑的内容会按它的标题自动保存，确定切换到「' + t + '」吗？', okText: '切换' });
+    if (!ok) { this.value = ''; return; }
+    saveDraft();
+  }
+  if (!loadDraftByTitle(t)) toast('该草稿是空的');
+  this.value = '';
+});
+// 标题变化: 自动保存旧稿 + 尝试加载新标题对应的稿
+titleInput.addEventListener('change', async function () {
+  const oldTitle = lastTitle;
+  const newTitle = titleInput.value.trim();
+  if (oldTitle === newTitle) return;
+  // 顺序很关键：必须先判断新标题下有没有旧稿，再决定要不要保存。
+  // 早期是先 saveDraft()（它按"新标题"存）—— 于是"有没有旧稿"恒为真，
+  // 弹窗问你要不要加载的其实是刚写进去的内容，真正的旧稿已经被覆盖了。
+  const key = draftKey(newTitle);
+  const hasOld = !!(newTitle && localStorage.getItem(key));
+  if (hasOld) {
+    const ok = await modal({
+      title: '发现同名草稿',
+      msg: '标题「' + newTitle + '」下已经有一份旧草稿。\n加载它的话，当前编辑内容会先按原标题存好；不加载就继续写当前的。',
+      okText: '加载旧稿'
+    });
+    if (ok) {
+      // 先把当前内容按"原标题"存好：临时把标题换回去再存，存完换回来
+      const cur = titleInput.value;
+      titleInput.value = oldTitle || '';
+      if (editor.innerHTML.trim() || editor.querySelector('img')) saveDraft();
+      titleInput.value = cur;
+      loadDraftByTitle(newTitle);
+      return;
+    }
+  }
+  if (editor.innerHTML.trim()) saveDraft();
+  lastTitle = newTitle;
+  refreshDraftSel();
+});
+titleInput.addEventListener('input', onEdit);
+titleInput.addEventListener('input', updateTitleCount);
+catSelect.addEventListener('change', onEdit);
+window.addEventListener('beforeunload', () => { if (editor.innerHTML.trim() || titleInput.value) saveDraft(); });
+
+function clearAll() {
+  const t = titleInput.value.trim();
+  const hasDraft = t && draftHasContent(t);
+  // 有草稿时让用户自己决定：只清编辑区（草稿留着当备份），还是连草稿一起删
+  const fields = hasDraft
+    ? [{ key: 'delDraft', label: '同时删除草稿「' + t + '」（删了就找不回来了）', type: 'checkbox' }]
+    : [];
+  modal({
+    title: '清空',
+    msg: '确定清空当前编辑内容？',
+    fields,
+    okText: '清空',
+    danger: true
+  }).then(ok => {
+    if (!ok) return;
+    editor.innerHTML = '';
+    titleInput.value = '';
+    updatePreview(); updateCounts(); updateTitleCount();
+    if (ok.delDraft) {
+      try { localStorage.removeItem(draftKey(t)); } catch (e) {}
+      try {
+        const list = draftIndex().filter(d => d.title !== t);
+        localStorage.setItem(DRAFT_INDEX, JSON.stringify(list.slice(0, 30)));
+      } catch (e) {}
+    }
+    lastTitle = '';
+    refreshDraftSel();
+    toast(hasDraft && ok.delDraft ? '已清空，草稿也一起删了' : '已清空');
+  });
+}
+
+// ---------- 导入 / 导出 Markdown ----------
+document.getElementById('importMd').addEventListener('change', async function () {
+  const files = Array.from(this.files);
+  this.value = '';
+  if (!files.length) return;
+  const mdFile = files.find(f => /\.(md|markdown|txt)$/i.test(f.name));
+  if (!mdFile) { toast('请至少选中一个 .md 稿件文件（图片可一起选中）'); return; }
+  if (editor.innerText.trim() || editor.querySelector('img')) {
+    const ok = await modal({ title: '导入 Markdown', msg: '导入会覆盖当前编辑的内容（当前内容会按标题自动保存），继续吗？', okText: '导入' });
+    if (!ok) return;
+  }
+  try {
+    const md = await mdFile.text();
+    // 其余选中的图片一起上传(按md里的相对路径匹配)
+    const imgFiles = files.filter(f => f !== mdFile && f.type.startsWith('image/'));
+    const images = [];
+    for (const f of imgFiles) {
+      const f2 = await maybeCompress(f);
+      images.push({ name: f.name, dataUrl: await fileToDataUrl(f2) });
+    }
+    const res = await fetchWithTimeout('/api/import-md', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ md, images }) }, 120000);
+    const j = await res.json();
+    if (!j.ok) { toast('导入失败: ' + j.error, 4000); return; }
+    titleInput.value = j.title || '';
+    editor.innerHTML = j.html || '';
+    updatePreview(); updateCounts(); updateTitleCount(); saveDraft();
+    let msg = '导入成功';
+    if (j.imageCount) msg += '（' + j.imageCount + ' 张图已就位）';
+    else if (j.refCount) msg += '（注意：md 引用的 ' + j.refCount + ' 张图没一起选中，图片位是空的，可手动 Ctrl+V 补图）';
+    toast(msg, j.imageCount ? 2600 : 6000);
+  } catch (e) { toast('导入出错: ' + e.message, 4000); }
+});
+function exportMd() {
+  const title = titleInput.value.trim() || '未命名';
+  let md = '# ' + title + '\n\n';
+  md += htmlToMd(editor);
+  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = title.replace(/[\\/:*?"<>|]/g, '_') + '.md';
+  // 早期 a.click() 后立刻 revoke —— 大文件/慢盘时 blob 已被回收，下载静默失败，
+  // 界面却照样提示"已导出"。挂到文档上并延后回收
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  toast('已导出 Markdown 文件');
+}
+// 简易 HTML -> Markdown(够用就好)
+function htmlToMd(root) {
+  let out = '';
+  root.childNodes.forEach(node => {
+    if (node.nodeType === 3) { out += node.textContent.replace(/\s+/g, ' '); return; }
+    if (node.nodeType !== 1) return;
+    const tag = node.tagName.toLowerCase();
+    const inner = htmlToMd(node).trim();
+    if (tag === 'h2') out += '\n## ' + inner + '\n\n';
+    else if (tag === 'h3') out += '\n### ' + inner + '\n\n';
+    else if (tag === 'p' || tag === 'div') {
+      if (node.classList && node.classList.contains('blockcode')) out += '\n```\n' + node.textContent + '\n```\n\n';
+      else if (node.classList && node.classList.contains('quote')) out += '\n> ' + node.textContent.trim() + '\n\n';
+      else out += inner + '\n\n';
+    }
+    else if (tag === 'br') out += '\n';
+    else if (tag === 'b' || tag === 'strong') out += '**' + inner + '**';
+    else if (tag === 'i' || tag === 'em') out += '*' + inner + '*';
+    else if (tag === 'u') out += '<u>' + inner + '</u>';
+    else if (tag === 'a') out += '[' + inner + '](' + (node.getAttribute('href') || '') + ')';
+    else if (tag === 'img') { const s = node.getAttribute('src') || ''; out += '![' + (node.getAttribute('alt') || '图片') + '](' + (s.startsWith('/draft-images/') ? s : s) + ')'; }
+    else if (tag === 'hr') out += '\n---\n\n';
+    else if (tag === 'ul' || tag === 'ol') { node.querySelectorAll(':scope > li').forEach(li => { out += (tag === 'ol' ? '1. ' : '- ') + htmlToMd(li).trim() + '\n'; }); out += '\n'; }
+    else if (tag === 'table') {
+      node.querySelectorAll('tr').forEach((tr, ri) => {
+        const cells = Array.from(tr.querySelectorAll('td')).map(td => htmlToMd(td).trim());
+        out += '| ' + cells.join(' | ') + ' |\n';
+        if (ri === 0) out += '|' + cells.map(() => '---').join('|') + '|\n';
+      });
+      out += '\n';
+    }
+    else if (tag === 'font' || tag === 'span') out += inner;
+    else out += inner;
+  });
+  return out;
+}
+
+// ---------- 编辑事件 ----------
+let saveTimer = null;
+function onEdit() {
+  updatePreview(); updateCounts(); updateToolbarState();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => saveDraft(), 1500);
+}
+editor.addEventListener('input', onEdit);
+
+// ---------- 登录状态 / 网页端登录流程 ----------
+let loginPolling = null;
+function showGate(show) {
+  // 每次弹出都把三块面板复位 —— 否则第二次弹出来只剩"登录成功"那块，没有按钮，成死局
+  if (show) resetGate();
+  document.getElementById('loginGate').style.display = show ? 'flex' : 'none';
+}
+// 登录门三块面板（待登录/等待中/登录成功）没有复位逻辑时，第二次弹出会只剩
+// "登录成功、正在进入工作台…"，没有任何按钮 —— 死局，只能杀进程重开
+function resetGate() {
+  const g = id => document.getElementById(id);
+  const idle = g('gateIdle'), wait = g('gateWaiting'), done = g('gateDone');
+  if (idle) idle.style.display = 'block';
+  if (wait) wait.style.display = 'none';
+  if (done) done.style.display = 'none';
+}
+// saveAs: 留空 = 新账号(自动用论坛昵称命名); 给名字 = 覆盖重登那个号
+async function startLogin(saveAs) {
+  try {
+    const r = await fetch('/api/login/start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ saveAs: saveAs || '' })
+    });
+    const j = await r.json().catch(() => ({}));
+    // 服务端起不来浏览器（组件缺失/残留进程）时返回 ok:false，
+    // 早期不读返回值，照样显示"已弹出"然后无限轮询
+    if (!j.ok) { toast('登录窗口启动失败：' + (j.error || '未知原因') + '（可点「🩺 体检」看环境）', 5000); return; }
+    resetGate();
+    document.getElementById('gateIdle').style.display = 'none';
+    document.getElementById('gateWaiting').style.display = 'block';
+    document.getElementById('loginGate').style.display = 'flex';
+    toast('绿联登录窗口已弹出，请在窗口里登录', 3500);
+    if (loginPolling) clearInterval(loginPolling);
+    loginPolling = setInterval(pollLogin, 1500);
+  } catch (e) { toast('启动登录失败: ' + e.message, 4000); }
+}
+async function pollLogin() {
+  try {
+    const j = await (await fetch('/api/login/status')).json();
+    if (j.state === 'success') {
+      clearInterval(loginPolling); loginPolling = null;
+      document.getElementById('gateWaiting').style.display = 'none';
+      document.getElementById('gateDone').style.display = 'block';
+      // 不再 reload —— 加第二个账号时 reload 会把正在写的稿子冲掉
+      setTimeout(() => showGate(false), 900);
+      authOk = true;
+      const el = document.getElementById('loginStatus');
+      el.textContent = j.user ? '✓ ' + j.user : '✓ 已登录'; el.classList.remove('bad');
+      const acc = (j.account === undefined || j.account === null) ? currentAccount : j.account;
+      await loadAccounts(acc);
+      await loadBoards(true);
+      toast('已登录' + (j.user ? '：' + j.user : '') + '，正在扫描该账号的版块权限…', 3500);
+    } else if (j.state === 'failed') {
+      clearInterval(loginPolling); loginPolling = null;
+      document.getElementById('gateWaiting').style.display = 'none';
+      document.getElementById('gateIdle').style.display = 'block';
+      toast('登录未完成，请重试', 4000);
+    }
+  } catch (e) {}
+}
+async function cancelLogin() {
+  try { await fetch('/api/login/cancel', { method: 'POST' }); } catch (e) {}
+  if (loginPolling) { clearInterval(loginPolling); loginPolling = null; }
+  document.getElementById('gateWaiting').style.display = 'none';
+  document.getElementById('gateIdle').style.display = 'block';
+}
+// ---------- 官方发帖页体检 ----------
+// 工具靠直接操作论坛发帖页的 DOM 工作，官方一改版就可能失效。
+// 发不动的时候点这个，能直接指出是哪一处坏了，而不是甩一句看不懂的报错。
+async function selfCheck() {
+  const fid = document.getElementById('postBoard').value || '9';
+  showOverlay('正在体检官方发帖页，约 15 秒…');
+  try {
+    const j = await (await fetchWithTimeout('/api/doctor?account=' + encodeURIComponent(currentAccount) + '&fid=' + encodeURIComponent(fid), {}, 120000)).json();
+    const lines = (j.items || []).map(i => (i.ok ? '  ✓ ' : '  ✗ ') + i.name + '：' + i.detail).join('\n');
+    const body = (j.ok ? '发帖页结构一切正常，发不了帖多半是账号或权限问题。' : (j.hint || '有项目不通过')) + '\n\n' + lines;
+    await modal({ title: j.ok ? '🩺 体检通过' : '🩺 体检发现问题', msg: body, okText: '知道了' });
+  } catch (e) {
+    await modal({ title: '🩺 体检失败', msg: String(e.message || e), okText: '知道了' });
+  } finally {
+    closeOverlay();
+  }
+}
+
+// ---------- 反馈球：可拖动，拖动时不触发点击 ----------
+const FAB_POS_KEY = 'ugreen_fab_pos';
+function placeFabCard() {
+  const fab = document.getElementById('fab'), card = document.getElementById('fabCard');
+  if (!fab || !card) return;
+  card.style.visibility = 'hidden'; card.classList.add('show');
+  const b = fab.getBoundingClientRect();
+  const w = card.offsetWidth, h = card.offsetHeight;
+  let left = b.left + b.width / 2 - w / 2;
+  let top = b.top - h - 10;                      // 优先放球上方
+  if (top < 8) top = b.bottom + 10;              // 上方放不下就放下方
+  left = Math.min(Math.max(left, 8), window.innerWidth - w - 8);
+  top = Math.min(Math.max(top, 8), window.innerHeight - h - 8);
+  card.style.left = left + 'px'; card.style.top = top + 'px';
+  card.style.visibility = '';
+}
+function toggleFabCard() {
+  const card = document.getElementById('fabCard');
+  if (!card) return;
+  if (card.classList.contains('show')) { card.classList.remove('show'); return; }
+  placeFabCard();
+}
+function initFab() {
+  const fab = document.getElementById('fab'), card = document.getElementById('fabCard');
+  if (!fab || !card) return;
+  // 边缘吸附（V1.4.0）：只记"贴哪边 + 垂直位置比例"，不记像素坐标。
+  // 窗口缩放/最大化后球始终贴边 —— 物理上不会再跑到屏幕中间。
+  function applyFabPos() {
+    try {
+      const p = JSON.parse(localStorage.getItem(FAB_POS_KEY) || 'null');
+      if (p && p.side) {
+        const h = fab.offsetHeight || 50;
+        const y = Math.min(Math.max(p.yRatio || 0.5, 0), 1) * (window.innerHeight - h - 12) + 6;
+        fab.style.top = y + 'px';
+        fab.style.bottom = 'auto';
+        if (p.side === 'left') { fab.style.left = '6px'; fab.style.right = 'auto'; }
+        else { fab.style.right = '6px'; fab.style.left = 'auto'; }
+        return;
+      }
+    } catch (e) {}
+    // 没拖过：默认右下角（走 CSS 的 right/bottom）
+    fab.style.left = 'auto'; fab.style.top = 'auto';
+    fab.style.right = '22px'; fab.style.bottom = '104px';
+  }
+  applyFabPos();
+  window.addEventListener('resize', applyFabPos);
+  // 双击球 = 回到默认右下角（后悔药）
+  fab.addEventListener('dblclick', e => {
+    e.preventDefault();
+    try { localStorage.removeItem(FAB_POS_KEY); } catch (err) {}
+    fab.style.left = 'auto'; fab.style.top = 'auto';
+    fab.style.right = '22px'; fab.style.bottom = '104px';
+    toast('反馈球已回到默认位置');
+  });
+  // 面板开合原本只写在 pointerup 里，纯键盘用户 Tab 过来按 Enter 是打不开的
+  fab.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleFabCard(); }
+  });
+  let active = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0;
+  fab.addEventListener('pointerdown', e => {
+    active = true; moved = false;
+    sx = e.clientX; sy = e.clientY;
+    const r = fab.getBoundingClientRect(); ox = r.left; oy = r.top;
+    try { fab.setPointerCapture(e.pointerId); } catch (_) {}
+    fab.classList.add('dragging');
+  });
+  fab.addEventListener('pointermove', e => {
+    if (!active) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    // 5px 阈值：手抖不至于变成拖动，真拖动也不会被当成点击
+    if (!moved && Math.abs(dx) + Math.abs(dy) < 5) return;
+    moved = true; e.preventDefault();
+    const w = fab.offsetWidth, h = fab.offsetHeight;
+    const nx = Math.min(Math.max(ox + dx, 6), window.innerWidth - w - 6);
+    const ny = Math.min(Math.max(oy + dy, 6), window.innerHeight - h - 6);
+    fab.style.left = nx + 'px'; fab.style.top = ny + 'px';
+    fab.style.right = 'auto'; fab.style.bottom = 'auto';
+    if (card.classList.contains('show')) placeFabCard();
+  });
+  fab.addEventListener('pointerup', () => {
+    if (!active) return;
+    active = false;
+    fab.classList.remove('dragging');
+    if (moved) {
+      // 拖动结束：吸附到最近的边（左/右），只存边和垂直比例 —— 绝不顺手打开面板
+      const r = fab.getBoundingClientRect();
+      const w = fab.offsetWidth, h = fab.offsetHeight;
+      const side = (r.left + w / 2) < window.innerWidth / 2 ? 'left' : 'right';
+      const yRatio = Math.min(Math.max((r.top - 6) / Math.max(1, window.innerHeight - h - 12), 0), 1);
+      if (side === 'left') { fab.style.left = '6px'; fab.style.right = 'auto'; }
+      else { fab.style.right = '6px'; fab.style.left = 'auto'; }
+      fab.style.top = Math.min(Math.max(yRatio * (window.innerHeight - h - 12) + 6, 6), window.innerHeight - h - 6) + 'px';
+      try {
+        localStorage.setItem(FAB_POS_KEY, JSON.stringify({ side, yRatio: +yRatio.toFixed(3) }));
+      } catch (e) {}
+      if (card.classList.contains('show')) placeFabCard();
+      card.classList.remove('show');
+    } else {
+      toggleFabCard();
+    }
+  });
+  // 点面板内部不要关掉
+  card.addEventListener('click', e => e.stopPropagation());
+  document.addEventListener('click', e => {
+    if (card.classList.contains('show') && !card.contains(e.target)
+      && !e.target.closest('#fab')) card.classList.remove('show');
+  });
+  window.addEventListener('resize', () => {
+    const fab2 = document.getElementById('fab');
+    if (!fab2) return;
+    const r = fab2.getBoundingClientRect();
+    if (r.right > window.innerWidth || r.bottom > window.innerHeight) {
+      fab2.style.left = Math.max(6, window.innerWidth - 56) + 'px';
+      fab2.style.top = Math.max(6, window.innerHeight - 156) + 'px';
+    }
+    if (card.classList.contains('show')) placeFabCard();
+  });
+}
+
+// ---------- 诊断报告（反馈用）----------
+function diagUrl(kind) {
+  const fid = document.getElementById('postBoard').value || '9';
+  return '/api/diag' + (kind === 'zip' ? '/zip' : '')
+    + '?deep=1&account=' + encodeURIComponent(currentAccount)
+    + '&fid=' + encodeURIComponent(fid);
+}
+async function doDiagZip(e) {
+  if (e) e.stopPropagation();
+  showOverlay('正在收集诊断信息（含在线体检，约 20 秒）…');
+  try {
+    // 先 HEAD 一次把体检跑完，再触发下载，避免下载到的包里体检是空的
+    await fetch(diagUrl('text'));
+  } catch (err) { /* 下载本身还会再跑一次，这里失败也不阻断 */ }
+  closeOverlay();
+  window.location.href = diagUrl('zip');
+  // 包下载了，但用户不知道发给谁就等于没用 —— 这里直接把投递方式说清楚
+  await modal({
+    title: '诊断包已开始下载', okText: '我知道了',
+    msg: '怎么把它给到作者：\n\n'
+      + '1. 打开微信，搜一搜 / 添加公众号「很多问题的小明同学」\n'
+      + '2. 在公众号里直接把这个 .zip 文件发过来\n'
+      + '3. 顺手写一句：遇到了什么现象 + 什么时候开始的（版本号在诊断报告第一行）\n\n'
+      + '包里只有三项结论：环境检测、发帖页体检、版块权限。\n'
+      + '不含账号密码、登录凭证、昵称、草稿正文与图片。'
+  });
+}
+
+let authOk = false;         // 服务端登录态快照，publish() 用它兜底拦截
+function checkLogin() {
+  fetch('/api/status').then(r => r.json()).then(j => {
+    const el = document.getElementById('loginStatus');
+    const banner = document.getElementById('loginBanner');
+    authOk = !!j.auth;
+    // 版本号（V1.3.0）：唯一源头是 webpost/package.json，服务端经 /api/status 带出来
+    if (j.version) {
+      const vt = document.getElementById('verTag');
+      if (vt) {
+        vt.textContent = 'V' + j.version;
+        vt.onclick = () => modal({ title: '关于', msg: '绿联社区发帖工作台\n版本：V' + j.version + '\n作者：很多问题的小明同学（微信公众号）\n\n本地工具，不联网收集任何数据；帖子内容只存在你自己电脑上。' });
+      }
+    }
+    if (j.auth) {
+      el.textContent = j.user ? '✓ ' + j.user : '✓ 已登录';
+      el.classList.remove('bad'); banner.style.display = 'none'; showGate(false);
+    } else {
+      el.textContent = '未登录'; el.classList.add('bad');
+      showGate(true); // 分发版: 未登录先过登录门
+    }
+  }).catch(() => { document.getElementById('loginStatus').textContent = '? 服务异常'; });
+}
+document.getElementById('loginStatus').addEventListener('click', () => { if (!document.getElementById('loginGate').style.display || document.getElementById('loginGate').style.display === 'none') checkLogin(); });
+
+// ---------- 账号与版块 ----------
+let boardsData = [];        // [{fid,name,canPost,cats}]
+let currentAccount = '';    // '' = 默认账号
+
+function currentBoard() {
+  const fid = document.getElementById('postBoard').value;
+  return boardsData.find(b => b.fid === fid) || null;
+}
+const ACT_ADD = '__add__', ACT_RELOGIN = '__relogin__', ACT_REMOVE = '__remove__';
+let hasAnyAccount = false;   // 登录门据此决定"加新号"还是"重登当前号"
+
+async function fetchAccounts() {
+  try {
+    const j = await (await fetch('/api/accounts')).json();
+    if (j && Array.isArray(j.accounts)) return j.accounts;
+  } catch (e) {}
+  // 一次网络抖动就返回 []，会让上层把账号柜清空、currentAccount 打回默认账号 ——
+  // 用户明明选的是「小号」，后续请求却全用默认号。拿不到就维持原状
+  return null;
+}
+function accountLabelOf(list, name) {
+  const a = list.find(x => x.name === name);
+  return a ? a.label : (name || '默认账号');
+}
+
+// 账号柜：本机存了几个号就列几个，可随时切换 / 加号 / 重登 / 移除
+// （自绘下拉 —— 原生 select 的弹出层是操作系统画的，行距没法控制）
+async function loadAccounts(selectName) {
+  const raw = await fetchAccounts();
+  // 拿不到账号列表时维持现状（别把用户选的号悄悄打回默认账号）
+  if (raw === null) { toast('读取账号列表失败，检查服务是否还在运行', 4000); return; }
+  const list = raw;
+  hasAnyAccount = list.length > 0;
+  const wrap = document.getElementById('acct');
+  const btn = document.getElementById('acctBtn');
+  const menu = document.getElementById('acctMenu');
+
+  function closeMenu() { wrap.classList.remove('open'); }
+  function item(v, t, extra) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'acct-item' + (extra || '');
+    b.textContent = t;
+    b.addEventListener('click', async e => {
+      e.stopPropagation();
+      closeMenu();
+      if (v === ACT_ADD) { await addAccount(); return; }
+      if (v === ACT_RELOGIN) { await reloginAccount(); return; }
+      if (v === ACT_REMOVE) { await removeAccount(); return; }
+      await switchAccount(v);
+    });
+    return b;
+  }
+  function cap(t) {
+    const d = document.createElement('div');
+    d.className = 'acct-cap'; d.textContent = t;
+    return d;
+  }
+
+  menu.innerHTML = '';
+  if (!list.length) {
+    currentAccount = '';
+    btn.textContent = '＋ 登录绿联账号';
+    menu.appendChild(item(ACT_ADD, '＋ 登录绿联账号'));
+    bindAcct(wrap, btn);
+    return;
+  }
+
+  const want = (selectName === undefined || selectName === null) ? currentAccount : selectName;
+  currentAccount = list.some(a => a.name === want) ? want : list[0].name;
+
+  // 按钮上显示当前身份
+  const curLabel = accountLabelOf(list, currentAccount);
+  btn.textContent = '👤 ' + curLabel + ' ▾';
+
+  menu.appendChild(cap('发帖身份'));
+  list.forEach(a => {
+    menu.appendChild(item(a.name, (a.name === currentAccount ? '✓ ' : '　') + a.label,
+      a.name === currentAccount ? ' cur' : ''));
+  });
+  menu.appendChild(document.createElement('div')).className = 'acct-sep';
+  menu.appendChild(cap('账号管理'));
+  menu.appendChild(item(ACT_ADD, '＋ 登录另一个账号'));
+  menu.appendChild(item(ACT_RELOGIN, '↻ 重新登录当前账号'));
+  menu.appendChild(item(ACT_REMOVE, '✕ 移除当前账号', ' danger'));
+  bindAcct(wrap, btn);
+}
+
+// 开合逻辑只绑一次：点按钮开/关，点页面其他地方关闭；键盘 ↑↓ / Enter 也能选
+function bindAcct(wrap, btn) {
+  if (wrap._bound) return;
+  wrap._bound = true;
+  btn.addEventListener('click', e => { e.stopPropagation(); wrap.classList.toggle('open'); });
+  document.addEventListener('click', e => { if (!wrap.contains(e.target)) wrap.classList.remove('open'); });
+  document.addEventListener('keydown', e => {
+    if (!wrap.classList.contains('open')) return;
+    const items = Array.from(wrap.querySelectorAll('.acct-item'));
+    const idx = items.indexOf(document.activeElement);
+    if (e.key === 'Escape') { wrap.classList.remove('open'); btn.focus(); return; }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      (idx < 0 ? items[0] : items[Math.min(idx + 1, items.length - 1)]).focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      (idx < 0 ? items[items.length - 1] : items[Math.max(idx - 1, 0)]).focus();
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      if (idx >= 0) { e.preventDefault(); items[idx].click(); }
+    }
+  });
+  // 菜单项获得焦点时给个可见的高亮（:hover 已经处理鼠标，这个管键盘）
+  wrap.addEventListener('keydown', e => {
+    if (e.target.classList && e.target.classList.contains('acct-item')) {
+      Array.from(wrap.querySelectorAll('.acct-item')).forEach(i => i.style.background = '');
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') e.target.style.background = '#eef6f1';
+    }
+  });
+}
+
+// 切换身份：不清空编辑器（防止写到一半切号把稿子弄丢），只换发帖身份 + 重扫权限
+async function switchAccount(name) {
+  currentAccount = name;
+  const list = (await fetchAccounts()) || [];
+  await loadAccounts(name);
+  const label = accountLabelOf(list, name);
+  toast('发帖身份已切换为「' + label + '」，正在重新扫描它的版块权限…', 3500);
+  await loadBoards(true); // 不同账号在不同版块权限不同，必须强制重扫
+}
+
+// 加号：先问一句备注名（可留空，留空就用论坛昵称），再弹绿联登录窗
+async function addAccount() {
+  const r = await modal({
+    title: '登录另一个绿联账号',
+    msg: '给这个账号起个好认的备注名，方便以后切换（比如「小号」「工作号」）。\n留空的话会自动用论坛昵称。\n\n点确定后会弹出绿联官方登录窗口，在那个窗口里登录你想加的账号。',
+    fields: [{ key: 'name', label: '备注名（可留空）', type: 'text', placeholder: '例如：小号' }],
+    okText: '去登录'
+  });
+  if (!r) { await loadAccounts(); return; }
+  await startLogin((r.name || '').trim());
+}
+
+async function reloginAccount() {
+  const list = (await fetchAccounts()) || [];
+  const label = accountLabelOf(list, currentAccount);
+  const okc = await modal({
+    title: '重新登录',
+    msg: '将重新登录「' + label + '」。\n\n登录态过期、或者提示"登录态已失效"时用这个。\n点确定后弹出绿联登录窗口。',
+    okText: '去登录'
+  });
+  if (!okc) { await loadAccounts(); return; }
+  // 默认账号（''）要显式告诉服务端去覆盖 auth.json，否则会被当成"加新号"
+  await startLogin(currentAccount || '__default__');
+}
+
+async function removeAccount() {
+  const list = (await fetchAccounts()) || [];
+  if (!currentAccount) {
+    toast('默认账号不能单独移除；想彻底清除请删掉 %LOCALAPPDATA%\\UGREENPostWorkbench 目录', 5000);
+    await loadAccounts(); return;
+  }
+  const label = accountLabelOf(list, currentAccount);
+  const okc = await modal({
+    title: '移除账号', danger: true, okText: '移除',
+    msg: '将删除本机保存的「' + label + '」登录凭证。\n\n不会在绿联官网注销这个账号，只是本机不再记住它，要用时重新登录即可。\n\n确定移除吗？'
+  });
+  if (!okc) { await loadAccounts(); return; }
+  const j = await (await fetch('/api/account/remove', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: currentAccount })
+  })).json();
+  if (!j.ok) { toast('移除失败: ' + (j.error || ''), 4000); await loadAccounts(); return; }
+  toast('已移除「' + label + '」', 3000);
+  const rest = (await fetchAccounts()) || [];
+  await loadAccounts(rest.length ? rest[0].name : '');
+  if (rest.length) await loadBoards(true);
+  else { authOk = false; showGate(true); }
+}
+async function loadBoards(force) {
+  const sel = document.getElementById('postBoard');
+  sel.innerHTML = '<option value="">扫描版块权限中…</option>';
+  // 扫描期间（尤其切账号后要几十秒）先把旧数据清掉：留着上一个账号的权限，
+  // 这期间点发布会拿错账号的权限去发
+  boardsData = [];
+  onBoardChange();
+  try {
+    const j = await (await fetch('/api/boards?account=' + encodeURIComponent(currentAccount) + (force ? '&force=1' : ''))).json();
+    if (!j.ok) {
+      sel.innerHTML = '<option value="">加载失败: ' + escHtml(j.error || '') + '</option>';
+      boardsData = [];
+      onBoardChange();   // 顺手把分类下拉置灰，别留着上一次的旧分类
+      // 登录态失效是最常见的失败原因，直接把解法递到手上
+      if (/登录态|失效|登录/.test(j.error || '')) {
+        authOk = false;
+        toast('当前账号登录态有问题 —— 点右上角账号 →「↻ 重新登录当前账号」', 5000);
+      }
+      return;
+    }
+    boardsData = j.boards || [];
+    sel.innerHTML = '';
+    const ok = boardsData.filter(b => b.canPost);
+    const no = boardsData.filter(b => !b.canPost);
+    if (ok.length) {
+      const g1 = document.createElement('optgroup'); g1.label = '✓ 可发帖 (' + ok.length + ')';
+      ok.forEach(b => g1.appendChild(boardOption(b)));
+      sel.appendChild(g1);
+    }
+    if (no.length) {
+      const g2 = document.createElement('optgroup'); g2.label = '✗ 无发帖权限 (' + no.length + ')';
+      no.forEach(b => g2.appendChild(boardOption(b)));
+      sel.appendChild(g2);
+    }
+    const prefer = boardsData.find(b => b.fid === '9' && b.canPost) || ok[0];
+    if (prefer) { sel.value = prefer.fid; onBoardChange(); }
+    if (j.user) {
+      // 过滤垃圾用户名(未登录态读到的"请 登录 或 立即注册"之类)
+      const u = String(j.user).trim();
+      if (u && u.length <= 20 && !/登录|注册/.test(u)) {
+        const el = document.getElementById('loginStatus');
+        el.textContent = '✓ ' + u; el.classList.remove('bad');
+      }
+    }
+    if (force) toast('版块已刷新: ' + ok.length + ' 个可发帖 / ' + no.length + ' 个无权限', 3000);
+  } catch (e) {
+    sel.innerHTML = '<option value="">加载失败</option>';
+    boardsData = [];
+    onBoardChange();
+  }
+}
+function boardOption(b) {
+  const o = document.createElement('option');
+  o.value = b.fid;
+  o.textContent = (b.canPost ? '' : '✗ ') + b.name + (b.cats && b.cats.length ? '（' + b.cats.length + '类）' : '');
+  return o;
+}
+function onBoardChange() {
+  const b = currentBoard();
+  const catSel = document.getElementById('postCat');
+  const keep = catSel.value;
+  // 没选版块时分类是没意义的（分类随版块变动）—— 置灰禁用，免得新手瞎选
+  catSel.disabled = !b;
+  catSel.title = b ? '主题分类（可不选）' : '先选版块，分类随版块联动';
+  catSel.innerHTML = '<option value="">主题分类（可不选）</option>';
+  if (b && b.cats && b.cats.length) {
+    b.cats.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c; o.textContent = c;
+      catSel.appendChild(o);
+    });
+    if (keep && b.cats.includes(keep)) catSel.value = keep;
+  } else if (b) {
+    const o = document.createElement('option');
+    o.value = ''; o.textContent = '（该版块无分类）'; o.disabled = true;
+    catSel.appendChild(o);
+  }
+}
+function refreshBoards(force) { loadBoards(!!force); }
+document.getElementById('postBoard').addEventListener('change', onBoardChange);
+
+// 带超时的 fetch：本机服务偶尔会卡在 Playwright 的等待上，没有超时的话
+// 前端就永远转圈（遮罩还关不掉）
+async function fetchWithTimeout(url, opts, ms) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), ms);
+  try {
+    return await fetch(url, Object.assign({}, opts, { signal: ctl.signal }));
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+// ---------- 发布 ----------
+const overlay = document.getElementById('overlay');
+function showOverlay(title) {
+  document.getElementById('ovTitle').innerHTML = '<span class="spinner"></span>' + title;
+  document.getElementById('ovLogs').textContent = '';
+  document.getElementById('ovResult').innerHTML = '';
+  document.getElementById('ovClose').style.display = 'none';
+  overlay.style.display = 'flex';
+}
+function closeOverlay() { overlay.style.display = 'none'; }
+function appendLogs(logs) {
+  const l = document.getElementById('ovLogs');
+  l.textContent = (logs || []).join('\n');
+  l.scrollTop = l.scrollHeight;
+}
+
+async function publish(submit) {
+  // 兜底：登录门平时会盖住按钮，但登录态可能在编辑过程中过期
+  // （比如别处退出登录），这时点发布必须先拦下来，否则会白跑一趟流程。
+  if (!authOk) {
+    toast('还没有登录，请先点右上角「未登录」登录绿联账号', 4500);
+    showGate(true);
+    return;
+  }
+  const title = titleInput.value.trim();
+  const html = editor.innerHTML;
+  if (!title) { toast('请先填写标题'); titleInput.focus(); return; }
+  const plain = editor.innerText.replace(/\s/g, '');
+  if (!plain && !editor.querySelector('img')) { toast('正文还是空的'); editor.focus(); return; }
+  const board = currentBoard();
+  if (!board) { toast('请先选择版块'); return; }
+  if (!board.canPost) {
+    toast('「' + board.name + '」版块当前账号没有发帖权限，请切换账号或版块', 4500);
+    return;
+  }
+  // 发布前检查清单（preflight）：把"发出去才发现的低级失误"提前拦下来。
+  // 阻断项（block）必须改；提醒项（warn）可以硬着头皮继续。
+  const pf = buildPreflight(board, submit);
+  if (pf.block.length) {
+    toast(pf.block[0], 5000);
+    return;
+  }
+  if (pf.warn.length) {
+    const pass = await showPreflight(pf);
+    if (!pass) return;
+  }
+  const imgN = editor.querySelectorAll('img').length;
+  const cat = catSelect.value;
+  // 弹确认框之前就把按钮禁掉：确认框是共用的同一份 DOM，连点两次会叠在一起，
+  // 其中一个流程永远等不到结果
+  document.getElementById('btnFill').disabled = true;
+  document.getElementById('btnPub').disabled = true;
+  if (submit) {
+    const ok = await modal({
+      title: '确认发布', danger: true, okText: '确认发布 🚀',
+      msg: '将发布到：绿联社区 · ' + board.name + '\n标题：' + title + '\n分类：' + (cat || '未选') + '\n内容：' + plain.length + ' 字 · ' + imgN + ' 张图\n\n发布后全站可见，确定吗？'
+    });
+    if (!ok) {
+      document.getElementById('btnFill').disabled = false;
+      document.getElementById('btnPub').disabled = false;
+      return;
+    }
+  }
+  showOverlay(submit ? '正在发布，约需 1 分钟，请勿关闭页面…' : '正在打开论坛并填入内容，约 30 秒…');
+  try {
+    // 加超时：服务端一旦卡在某个页面上（要几十秒到几分钟），前端会一直转圈，
+    // 遮罩也关不掉，只能强杀标签页。超时后把遮罩放出来，让用户自己重试。
+    const res = await fetchWithTimeout('/api/publish', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, html, cat, fid: board.fid, boardName: board.name, account: currentAccount, submit })
+    }, 240000);
+    const j = await res.json();
+    appendLogs(j.logs);
+    const result = document.getElementById('ovResult');
+    if (j.ok) {
+      if (submit) {
+        markPosted();                    // 记时间，下次 preflight 算限流倒计时
+        if (j.postUrl) recordPosted(j.postUrl);   // 记进发布记录（可再发一次）
+      }
+      document.getElementById('ovTitle').textContent = submit ? '🎉 发布成功' : '✓ 已填入编辑器';
+      if (submit && j.postUrl) {
+        result.innerHTML = '帖子已发布：<br><a href="' + j.postUrl + '" target="_blank">👉 ' + j.postUrl + '</a>' +
+          '<br><br>（弹出的浏览器窗口还开着，可以直接关掉）';
+      } else {
+        result.innerHTML = '内容已填入论坛编辑器（<b>未发布</b>）。<br><b>弹出的浏览器窗口会一直开着</b>，那就是论坛发帖页 —— 你慢慢检查，确认没问题后点「发表帖子」；看完直接关掉窗口也不影响。<br>' +
+          (j.screenshot ? '截图：<a href="/shots/' + j.screenshot + '" target="_blank">' + j.screenshot + '</a>' : '');
+      }
+    } else if (j.pending) {
+      // 待审核：帖子交上去了，等管理员放行。不算失败。
+      document.getElementById('ovTitle').textContent = '⏳ 已提交，待管理员审核';
+      document.getElementById('ovResult').innerHTML = '帖子已成功提交到论坛，管理员审核通过后才会对大家显示。<br>' +
+        '已自动记入「📝 发布记录」，之后可以在那里检测审核状态。' +
+        '<br><br><b>不要重复发布</b>，审核通常几分钟到几小时。';
+    } else {
+      document.getElementById('ovTitle').textContent = '✗ 失败';
+      result.innerHTML = '错误：' + (j.error || '未知') + '<br>' +
+        (j.screenshot ? '错误截图：<a href="/shots/' + j.screenshot + '" target="_blank">' + j.screenshot + '</a>' : '') +
+        '<br><br>如果是登录问题，请按页面上方的指引重新登录';
+      // 降级模式：自动链路挂了也不让用户卡死 —— 一键复制全文 + 打开官方发帖页，
+      // 手动粘贴发出去。官方大改版当天，工具靠这个照样能用。
+      if (j.fallback && j.fallback.html) {
+        const fb = document.createElement('div');
+        fb.style.cssText = 'margin-top:14px;padding:12px;border-radius:10px;background:#FFF8E1;border:1px solid #FFE082;';
+        fb.innerHTML = '<b>手动发也可以：</b>先把内容复制下来，到官方发帖页粘贴，自己点发表。';
+        const btnRow = document.createElement('div');
+        btnRow.style.cssText = 'margin-top:10px;display:flex;gap:10px;';
+        const b1 = document.createElement('button');
+        b1.className = 'btn btn-green'; b1.textContent = '📋 复制全文';
+        b1.onclick = async () => {
+          const ok = await copyFallbackHtml(j.fallback);
+          toast(ok ? '正文已复制，去论坛页面按 Ctrl+V 粘贴' : '复制失败，请手动选中内容复制', 3500);
+        };
+        const b2 = document.createElement('button');
+        b2.className = 'btn btn-gray'; b2.textContent = '🌐 打开官方发帖页';
+        b2.onclick = () => { window.open(j.fallback.url, '_blank'); };
+        btnRow.appendChild(b1); btnRow.appendChild(b2);
+        fb.appendChild(btnRow);
+        if (j.fallback.images && j.fallback.images.length) {
+          const tip = document.createElement('div');
+          tip.style.cssText = 'margin-top:8px;font-size:12px;color:#8a6d00;';
+          tip.textContent = '注意：' + j.fallback.images.length + ' 张图无法自动上传，请在论坛页面手动添加图片。';
+          fb.appendChild(tip);
+        }
+        result.appendChild(fb);
+      }
+    }
+  } catch (e) {
+    const isTimeout = e && e.name === 'AbortError';
+    document.getElementById('ovTitle').textContent = isTimeout ? '⏱ 超时了' : '✗ 请求失败';
+    document.getElementById('ovResult').innerHTML = isTimeout
+      ? '等了 4 分钟还没结果 —— 多半是论坛页面卡住了，或登录态已失效。<br><br>'
+        + '建议：点右上角「🩺 体检」先看一眼；换一个版块或账号再试；<br>'
+        + '仍不行就点右下角的球下载诊断包发给作者。<br><br>'
+        + '<b>你写的内容已经存在本机草稿里，不会丢。</b>'
+      : escHtml(e.message);
+  } finally {
+    document.getElementById('ovClose').style.display = 'inline-block';
+    document.getElementById('btnFill').disabled = false;
+    document.getElementById('btnPub').disabled = false;
+  }
+}
+
+// ---------- 发布记录（V1.2.0）----------
+// 发过的帖子记在本机（链接/时间/账号/标题/正文），能一键载入"再发一次"，
+// 也能导出留档。发布成功后由 recordPosted() 自动写入。
+async function recordPosted(url) {
+  try {
+    const plain = plainText();
+    await fetchWithTimeout('/api/posts', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: document.getElementById('postTitle').value.trim(),
+        url, board: (currentBoard() || {}).name || '',
+        account: currentAccount || '默认账号',
+        chars: plain.length, images: editor.querySelectorAll('img').length,
+        html: editor.innerHTML,
+      }),
+    }, 15000);
+  } catch (e) { /* 记录失败不影响发帖本身，静默 */ }
+}
+
+async function openPosts() {
+  let j = null;
+  try { j = await fetchWithTimeout('/api/posts', {}, 15000).then(r => r.json()); } catch (e) {}
+  if (!j || !j.ok) {
+    await modal({ title: '发布记录', msg: '读取失败：' + ((j && j.error) || '服务无响应') });
+    return;
+  }
+  const list = j.items || [];
+  if (!list.length) {
+    await modal({ title: '发布记录', msg: '还没有记录。用「直接发布」发出去的帖子会自动记在这里，方便以后再发一次。' });
+    return;
+  }
+  const stIcon = (r) => r.status === 'pending' ? '⏳待审核' : r.status === 'removed' ? '❌未过审/被删' : '✅';
+  const menu = list.slice(0, 20).map((r, i) =>
+    (i + 1) + '. [' + stIcon(r) + '] ' + r.time + ' · ' + r.board + ' · ' + r.title.slice(0, 22) + '（' + r.chars + '字/' + r.images + '图）'
+  ).join('\n');
+  const r = await modal({
+    title: '发布记录（' + list.length + ' 条）',
+    okText: '载入这篇',
+    msg: menu + '\n\n「载入这篇」把内容放回编辑器改完再发；「检测状态」用你已登录的浏览器\n无头打开帖子看一眼，自动更新 ✅/⏳/❌（帖子少的条目无法检测）。',
+    fields: [{ key: 'idx', label: '序号', type: 'text', value: '1' }],
+    actions: [
+      { text: '🌐 打开原帖', cls: 'btn-gray', fn: async (close) => {
+        close();
+        const n = Number((document.getElementById('mdBody').querySelector('input') || {}).value || 1);
+        const rec = list[n - 1];
+        if (rec && rec.url) window.open(rec.url, '_blank'); else toast('这条没有链接（待审核的帖子还没生成链接）');
+      } },
+      { text: '🔍 检测状态', cls: 'btn-gray', fn: async (close) => {
+        close();
+        const n = Number((document.getElementById('mdBody').querySelector('input') || {}).value || 1);
+        const rec = list[n - 1];
+        if (!rec || !rec.url) { toast('这条没有链接，检测不了'); return; }
+        showOverlay('正在打开帖子检测状态（约 10 秒）…');
+        try {
+          const j2 = await fetchWithTimeout('/api/check-post', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ index: n, url: rec.url, account: rec.account }),
+          }, 90000).then(x => x.json());
+          document.getElementById('ovTitle').textContent = j2.ok
+            ? (j2.status === 'published' ? '✅ 已通过审核，帖子正常显示' : j2.status === 'pending' ? '⏳ 还在审核中' : '❌ 未通过审核或已被删除')
+            : '检测失败';
+          document.getElementById('ovResult').innerHTML = (j2.reason || j2.error || '');
+        } catch (e) {
+          document.getElementById('ovTitle').textContent = '检测失败';
+          document.getElementById('ovResult').textContent = e.message;
+        } finally {
+          document.getElementById('ovClose').style.display = 'inline-block';
+        }
+      } },
+      { text: '＋ 补记录', cls: 'btn-gray', fn: async (close) => {
+        close();
+        const r2 = await modal({
+          title: '手动补记录（填入模式发的帖子在这里补一条）',
+          okText: '保存',
+          fields: [
+            { key: 'title', label: '帖子标题', type: 'text', value: document.getElementById('postTitle').value.trim() },
+            { key: 'url', label: '帖子链接（发完后浏览器地址栏复制）', type: 'text', value: '' },
+            { key: 'board', label: '版块名（可选）', type: 'text', value: (currentBoard() || {}).name || '' },
+          ],
+          require: 'url',
+        });
+        if (!r2) return;
+        try {
+          await fetchWithTimeout('/api/posts', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: r2.title, url: r2.url, board: r2.board, account: currentAccount || '默认账号',
+              chars: plainText().length, images: editor.querySelectorAll('img').length, html: editor.innerHTML,
+            }),
+          }, 15000);
+          toast('已补记录');
+        } catch (e) { toast('补记录失败：' + e.message); }
+      } },
+      { text: '🗑 删记录', cls: 'btn-gray', fn: async (close) => {
+        close();
+        const r2 = await modal({
+          title: '删除这条记录', okText: '删除', danger: true,
+          msg: menu, fields: [{ key: 'idx', label: '要删第几条', type: 'text', value: '1' }],
+        });
+        if (!r2) return;
+        try {
+          const j2 = await fetchWithTimeout('/api/posts', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ del: Number(r2.idx) }),
+          }, 15000).then(x => x.json());
+          toast(j2 && j2.ok ? '已删除' : '删除失败：' + ((j2 && j2.error) || ''));
+        } catch (e) { toast('删除失败：' + e.message); }
+      } },
+    ],
+  });
+  if (!r) return;
+  const rec = list[Number(r.idx) - 1];
+  if (!rec) { toast('序号不对'); return; }
+  // 载入：先按标题存当前内容（不覆盖），再把旧帖内容放回编辑器
+  if (!confirmLoad(rec)) return;
+  document.getElementById('postTitle').value = rec.title || '';
+  editor.innerHTML = rec.html || '';
+  updateTitleCount(); updateCounts(); updatePreview(); saveDraft();
+  toast('已载入「' + (rec.title || '旧帖') + '」，改完再发就是新的一篇');
+}
+
+function confirmLoad(rec) {
+  const cur = plainText().length;
+  if (cur < 10) return true;
+  return confirm('载入这篇会把编辑器内容替换掉（当前内容已按标题存草稿，不会丢）。继续吗？');
+}
+
+// ---------- 顶栏下拉菜单 + HTML 导入导出（V1.3.0）----------
+function toggleMenu(id, btn) {
+  const m = document.getElementById(id);
+  const open = m.style.display === 'none';
+  hideMenus();
+  if (open) m.style.display = 'block';
+}
+function hideMenus() {
+  document.querySelectorAll('.hmenu').forEach(m => { m.style.display = 'none'; });
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.hmenu') && !e.target.closest('button')) hideMenus();
+});
+
+// 导入 HTML 文件：取 <body> 内容放进编辑器。图片若是相对路径引用外部文件，
+// 本地打不开 —— 提醒用户图片要重新粘贴；dataURL 内嵌的图片则原样保留
+document.getElementById('importHtml').addEventListener('change', async function () {
+  const f = this.files && this.files[0];
+  this.value = '';
+  if (!f) return;
+  try {
+    const okGo = await modal({ title: '导入 HTML', okText: '导入', msg: '导入会覆盖当前编辑内容（当前内容已自动存草稿）。文字和内嵌图片会一起进来；引用外部文件的图片可能显示不出来。' });
+    if (!okGo) return;
+    const raw = await f.text();
+    const doc = new DOMParser().parseFromString(raw, 'text/html');
+    const body = doc.body ? doc.body.innerHTML : raw;
+    if (!body.trim()) { toast('这个 HTML 文件里没有内容'); return; }
+    editor.innerHTML = body;
+    updateTitleCount(); updateCounts(); updatePreview(); saveDraft();
+    const imgs = editor.querySelectorAll('img').length;
+    const broken = Array.from(editor.querySelectorAll('img')).filter(i => !i.src.startsWith('data:')).length;
+    toast('导入成功' + (imgs ? '（' + imgs + ' 张图' + (broken ? '，其中 ' + broken + ' 张是外部引用，发帖前请确认能显示' : '全部内嵌') + '）' : ''), 4000);
+  } catch (e) { toast('导入出错: ' + e.message, 4000); }
+});
+
+// 导出 HTML 单文件：编辑器里的图片全部转成 base64 内嵌，
+// 双击打开就能看，也能整篇复制粘贴回论坛（图片跟着走）
+async function exportHtml() {
+  const title = document.getElementById('postTitle').value.trim() || '未命名';
+  const wrap = document.createElement('div');
+  wrap.innerHTML = editor.innerHTML;
+  const imgs = Array.from(wrap.querySelectorAll('img'));
+  for (const img of imgs) {
+    try {
+      if (img.src.startsWith('data:')) continue;
+      const blob = await fetch(img.src).then(r => r.blob());
+      const dataUrl = await new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = () => res(fr.result); fr.onerror = rej;
+        fr.readAsDataURL(blob);
+      });
+      img.src = dataUrl;
+    } catch (e) { /* 单张失败不影响整体，保留原 src */ }
+  }
+  const doc = '<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n<title>' + escHtml(title) + '</title>\n' +
+    '<style>body{max-width:860px;margin:32px auto;padding:0 16px;font:15px/1.8 "Microsoft YaHei",sans-serif;color:#222;} img{max-width:100%;border-radius:4px;} blockquote{border-left:4px solid #12905A;margin:0;padding:4px 14px;background:#F4FAF7;color:#555;} pre{background:#F6F8FA;padding:12px;border-radius:6px;overflow:auto;} table{border-collapse:collapse;} td,th{border:1px solid #ddd;padding:6px 10px;}</style>\n' +
+    '</head>\n<body>\n<h1>' + escHtml(title) + '</h1>\n' + wrap.innerHTML + '\n</body>\n</html>';
+  const blob = new Blob([doc], { type: 'text/html;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = title.replace(/[\\/:*?"<>|]/g, '_') + '.html';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  toast('已导出 HTML（图片已内嵌）');
+}
+
+// ---------- 片段库（V1.1.0）----------
+// 每次写帖都要重复的那几段（开头寒暄、设备信息表、免责声明），存下来一键插入。
+// 只存本机 localStorage，不上传；内容全是通用文案，不含任何品牌字样。
+const SNIP_KEY = 'ugreen_snippets_v1';
+const BUILTIN = [
+  {
+    name: '开头 · 日常寒暄',
+    html: '<p>大家好，又来折腾了。这次把踩到的坑和实测结果整理了一下，给大家做个参考，有说得不对的地方欢迎指正。</p>',
+  },
+  {
+    name: '设备信息表',
+    html: '<p><b>本次测试环境：</b></p><p>・主机：_____（型号/CPU/内存）<br>・硬盘：_____（容量/型号/阵列模式）<br>・系统：_____（版本号）<br>・网络：_____（带宽/连接方式）</p>',
+  },
+  {
+    name: '结尾 · 免责声明',
+    html: '<p><b>说明：</b>以上都是我本机实测的结果，不同硬件、固件版本、网络环境下数据会有差异，仅供同样折腾的朋友参考。涉及拆机/改配置的操作请自行评估风险，重要数据务必先备份。</p>',
+  },
+  {
+    name: '结尾 · 求互动',
+    html: '<p>如果你也在用类似方案，欢迎在评论区聊聊你的实测数据 —— 尤其是和我不一样的那部分，最值得讨论。觉得有用的话点个赞，我接着往下挖。</p>',
+  },
+];
+
+function loadSnippets() {
+  try {
+    const raw = localStorage.getItem(SNIP_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return arr;
+    }
+  } catch (e) {}
+  // 第一次用：塞 4 个通用示例，让人一打开就知道这玩意儿能干啥
+  const init = BUILTIN.map((s, i) => ({ id: 'b' + i, name: s.name, html: s.html }));
+  saveSnippets(init);
+  return init;
+}
+function saveSnippets(list) {
+  try { localStorage.setItem(SNIP_KEY, JSON.stringify(list)); } catch (e) { toast('片段库保存失败（本地存储不可用）'); }
+}
+
+async function openSnippets() {
+  const list = loadSnippets();
+  const plainOf = (h) => String(h || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!list.length) {
+    const r = await modal({ title: '片段库', msg: '还没有任何片段。先把常用的段落存进来，下次一键插入。', okText: '新建片段' });
+    if (r) await newSnippet();
+    return;
+  }
+  // 列表式（V1.4.0）：名字 + 内容预览一目了然，输序号直接插
+  const menu = list.map((s, i) =>
+    (i + 1) + '. ' + s.name + '｜' + plainOf(s.html).slice(0, 26) + (plainOf(s.html).length > 26 ? '…' : '')
+  ).join('\n');
+  const freqOn = (() => { try { return localStorage.getItem('ugreen_freq_enabled') !== '0'; } catch (e) { return true; } })();
+  const actions = [
+    { text: '＋ 新建', cls: 'btn-gray', fn: async (close) => { close(); await newSnippet(); } },
+    { text: '✎ 改名', cls: 'btn-gray', fn: async (close) => { close(); await renameSnippet(); } },
+    { text: '🗑 删除', cls: 'btn-gray', fn: async (close) => { close(); await delSnippet(); } },
+  ];
+  if (freqOn) actions.push({ text: '📊 高频统计', cls: 'btn-gray', fn: async (close) => { close(); await freqStats(); } });
+  actions.push({ text: '⚙ 统计开关', cls: 'btn-gray', fn: async (close) => { close(); await freqToggle(); } });
+  const r = await modal({
+    title: '片段库（' + list.length + ' 条）',
+    okText: '插入选中',
+    msg: menu + '\n\n输入序号点「插入选中」，就把这段放进正文光标处。' + (freqOn ? '' : '\n（高频统计功能已关闭，可用「⚙ 统计开关」重新打开）'),
+    fields: [{ key: 'idx', label: '序号', type: 'text', value: '1' }],
+    actions,
+  });
+  if (!r) return;
+  const hit = list[Number(r.idx) - 1];
+  if (!hit) { toast('序号不对（1-' + list.length + '）'); return; }
+  insertSnippet(hit);
+}
+
+// ---------- 片段库 · 本地高频统计（V1.4.0）----------
+// 原理：只扫描【本机】的发布记录和当前编辑器里的文字，按"重复出现的整句"和
+// "高频短语"做计数排序，给你勾选存成片段。全程不联网、不用 AI 模型、
+// 结果只保存在本机 localStorage —— 除了你自己的电脑，任何人都看不到。
+const FREQ_KEY = 'ugreen_freq_enabled';
+
+async function freqToggle() {
+  const cur = (() => { try { return localStorage.getItem(FREQ_KEY) !== '0'; } catch (e) { return true; } })();
+  const r = await modal({
+    title: '高频统计开关',
+    okText: '保存',
+    msg: '「高频统计」会扫描你本机的发布记录和当前编辑器文字，找出重复出现的句子和短语，\n'
+      + '帮你一键存成片段。原理：纯文本计数（数哪个句子出现了几次），\n'
+      + '不联网、不用 AI 模型、毫秒级完成，结果只存在本机 —— 不存在隐私外泄。',
+    fields: [{ key: 'en', label: '启用「📊 高频统计」按钮', type: 'checkbox', value: cur }],
+  });
+  if (!r) return;
+  try { localStorage.setItem(FREQ_KEY, r.en ? '1' : '0'); } catch (e) {}
+  toast(r.en ? '已开启高频统计' : '已关闭高频统计');
+}
+
+async function freqStats() {
+  showOverlay('正在统计本地文本（毫秒级，别眨眼）…');
+  try {
+    let texts = editor.innerText + '\n';
+    try {
+      const j = await fetchWithTimeout('/api/posts', {}, 15000).then(x => x.json());
+      (j.items || []).forEach(r => { texts += (r.title || '') + ' ' + String(r.html || '').replace(/<[^>]+>/g, ' ') + '\n'; });
+    } catch (e) {}
+    // 候选 1：重复出现的整句（8~80 字，出现 ≥2 次）
+    const sents = texts.split(/[。！？!?\n；;]+/).map(s => s.trim()).filter(s => s.length >= 8 && s.length <= 80);
+    const sc = {};
+    sents.forEach(s => { sc[s] = (sc[s] || 0) + 1; });
+    const repSents = Object.entries(sc).filter(([s, c]) => c >= 2).sort((a, b) => b[1] - a[1]).slice(0, 12);
+    // 候选 2：高频短语（4~8 字滑窗，出现 ≥3 次，滤掉虚词开头结尾）
+    const stop = '的了了吗呢吧啊呀哦么很也都就还又再才和与或是并在把被对让向往前 after the and'.split(' ');
+    const zh = texts.replace(/<[^>]+>/g, '');
+    const grams = {};
+    for (let n = 4; n <= 8; n++) {
+      for (let i = 0; i + n <= zh.length; i++) {
+        const g = zh.slice(i, i + n);
+        if (/[，。！？、；：""''（）()\s\d]/.test(g[0]) || /[，。！？、；：""''（）()\s]/.test(g)) continue;
+        if (stop.includes(g[0]) || stop.includes(g[g.length - 1])) continue;
+        grams[g] = (grams[g] || 0) + 1;
+      }
+    }
+    const topGramsRaw = Object.entries(grams).filter(([g, c]) => c >= 3).sort((a, b) => b[1] - a[1]);
+    // 滑窗会产生大量互相重叠的碎片（"数据无价"/"据无价且"/"无价且行"其实是同一句），
+    // 只保留互相不重叠的 top 几条，列表才可读
+    const topGrams = [];
+    for (const [g, c] of topGramsRaw) {
+      if (topGrams.length >= 8) break;
+      if (topGrams.some(([t]) => t.includes(g) || g.includes(t))) continue;
+      topGrams.push([g, c]);
+    }
+    const cands = [];
+    repSents.forEach(([s, c]) => cands.push({ name: '句·' + s.slice(0, 10), html: '<p>' + s + '。</p>', c }));
+    topGrams.forEach(([g, c]) => cands.push({ name: '词·' + g, html: g, c }));
+    if (!cands.length) {
+      await modal({ title: '高频统计', msg: '本机文本里没找到重复出现的句子或短语（每种至少要出现 2~3 次才有候选）。\n多写几篇之后再来试试。' });
+      return;
+    }
+    const menu = cands.map((c, i) => (i + 1) + '. (x' + c.c + ') ' + c.name + '｜' + plainSnip(c.html).slice(0, 30)).join('\n');
+    const r = await modal({
+      title: '高频统计 · 候选片段（本机数据）',
+      okText: '存为片段',
+      msg: '【原理】只统计了你本机的发布记录和当前编辑器，纯文本计数，不联网、不用 AI。\n'
+        + '【用法】输入候选序号（多个用逗号隔开，如 1,3），点「存为片段」。不想存就点取消。\n\n' + menu,
+      fields: [{ key: 'idx', label: '要保存的候选序号', type: 'text', value: '1', placeholder: '如：1 或 1,3' }],
+    });
+    if (!r || !String(r.idx).trim()) return;
+    const picks = String(r.idx).split(/[,，\s]+/).map(Number).filter(n => n >= 1 && n <= cands.length);
+    if (!picks.length) { toast('序号不对'); return; }
+    const list = loadSnippets();
+    picks.forEach(n => list.push({ id: 'f' + Date.now() + '_' + n, name: cands[n - 1].name, html: cands[n - 1].html }));
+    saveSnippets(list);
+    toast('已保存 ' + picks.length + ' 条到片段库');
+  } finally {
+    closeOverlay();
+  }
+}
+function plainSnip(h) { return String(h || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(); }
+
+async function openSnippetsOld() {} // 占位防误调
+
+async function pickSnippet() {
+  const list = loadSnippets();
+  const r = await modal({
+    title: '片段列表',
+    okText: '插入这条',
+    msg: list.map((s, i) => (i + 1) + '. ' + s.name).join('\n'),
+    fields: [{ key: 'idx', label: '输入序号', type: 'text', value: '1' }],
+  });
+  if (!r) return;
+  const s = list[Number(r.idx) - 1];
+  if (!s) { toast('序号不对'); return; }
+  insertSnippet(s);
+}
+
+async function newSnippet() {
+  // 有选中内容就默认拿选中的那段当模板内容，省去重新打字
+  let picked = '';
+  try {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && !sel.isCollapsed) {
+      const d = document.createElement('div');
+      d.appendChild(sel.getRangeAt(0).cloneContents());
+      picked = d.innerHTML;
+    }
+  } catch (e) {}
+  const r = await modal({
+    title: '新建片段',
+    okText: '保存',
+    fields: [
+      { key: 'name', label: '片段名（如：结尾·免责声明）', type: 'text', value: '', placeholder: '给它起个好认的名字' },
+      { key: 'html', label: '内容（可用 HTML；不填就是普通文字）', type: 'textarea', rows: 8, value: picked, placeholder: '把要复用的段落粘进来' },
+    ],
+    require: 'name',
+  });
+  if (!r) return;
+  const list = loadSnippets();
+  const txt = String(r.html || '').trim();
+  const html = /<[a-z][\s\S]*>/i.test(txt) ? txt : '<p>' + txt.replace(/\n+/g, '</p><p>') + '</p>';
+  list.push({ id: 's' + Date.now(), name: String(r.name).trim(), html });
+  saveSnippets(list);
+  toast('片段已保存：' + r.name);
+}
+
+async function renameSnippet() {
+  const list = loadSnippets();
+  const r = await modal({
+    title: '改名 / 改内容',
+    okText: '保存',
+    msg: list.map((s, i) => (i + 1) + '. ' + s.name).join('\n'),
+    fields: [
+      { key: 'idx', label: '要改第几条（序号）', type: 'text', value: '1' },
+      { key: 'name', label: '新名字（留空则不改）', type: 'text', value: '' },
+    ],
+  });
+  if (!r) return;
+  const s = list[Number(r.idx) - 1];
+  if (!s) { toast('序号不对'); return; }
+  if (String(r.name || '').trim()) s.name = String(r.name).trim();
+  saveSnippets(list);
+  toast('已更新：' + s.name);
+}
+
+async function delSnippet() {
+  const list = loadSnippets();
+  const r = await modal({
+    title: '删除片段',
+    okText: '删除', danger: true,
+    msg: list.map((s, i) => (i + 1) + '. ' + s.name).join('\n'),
+    fields: [{ key: 'idx', label: '要删第几条（序号）', type: 'text', value: '1' }],
+  });
+  if (!r) return;
+  const i = Number(r.idx) - 1;
+  if (!list[i]) { toast('序号不对'); return; }
+  const name = list[i].name;
+  list.splice(i, 1);
+  saveSnippets(list);
+  toast('已删除：' + name);
+}
+
+function insertSnippet(s) {
+  editor.focus();
+  // execCommand 插入后光标会停在片段末尾，接着写很自然
+  document.execCommand('insertHTML', false, s.html);
+  onEdit(); updateCounts(); updatePreview();
+  toast('已插入：' + s.name);
+}
+
+// ---------- 图片：选中 / 上移 / 下移 / 删除 / 拖拽排序（V1.0.2）----------
+// 以前插错图只能清空重写，现在点一下就能调顺序或删掉单独一张
+let pickedImg = null;
+function imgBar() { return document.getElementById('imgBar'); }
+
+function clearImgSel() {
+  if (pickedImg) pickedImg.classList.remove('picked');
+  pickedImg = null;
+  const b = imgBar(); if (b) b.style.display = 'none';
+}
+
+function selectImg(img) {
+  if (pickedImg && pickedImg !== img) pickedImg.classList.remove('picked');
+  pickedImg = img;
+  img.classList.add('picked');
+  const b = imgBar();
+  if (!b) return;
+  const r = img.getBoundingClientRect();
+  b.style.display = 'flex';
+  // 贴在图片下方中央；靠近窗口底部时改贴到图片上方，别被任务栏挡住
+  const below = r.bottom + 6;
+  b.style.left = Math.max(6, Math.min(window.innerWidth - 260, r.left + r.width / 2 - 110)) + 'px';
+  b.style.top = (below + 44 < window.innerHeight ? below : Math.max(6, r.top - 44)) + 'px';
+}
+
+/** 在 DOM 里把 img 与"前一个/后一个可交换的块级兄弟"互换位置 */
+function moveImg(img, dir) {
+  const nodes = Array.from(editor.querySelectorAll('img'));
+  const i = nodes.indexOf(img);
+  const j = i + (dir === 'up' ? -1 : 1);
+  if (i < 0 || j < 0 || j >= nodes.length) return false;
+  const a = nodes[i], b = nodes[j];
+  // 两张图在同一个父节点里：直接交换
+  if (a.parentNode === b.parentNode) {
+    if (dir === 'up') a.parentNode.insertBefore(a, b);
+    else a.parentNode.insertBefore(b, a);
+  } else {
+    // 跨段落：整块（所在 block）互换，视觉顺序才符合直觉
+    const ba = a.closest('p,div,li') || a, bb = b.closest('p,div,li') || b;
+    if (dir === 'up') bb.parentNode.insertBefore(ba, bb);
+    else ba.parentNode.insertBefore(bb, ba);
+  }
+  onEdit(); updateCounts(); updatePreview();
+  selectImg(a);                       // 选中状态跟着图走
+  return true;
+}
+
+function delImg(img) {
+  const nodes = Array.from(editor.querySelectorAll('img'));
+  const i = nodes.indexOf(img);
+  // 图片独占一段时，连那个空段落一起清掉，不留空行
+  const block = img.closest('p,div,li');
+  if (block && block.textContent.trim() === '' && block.querySelectorAll('img').length === 1) block.remove();
+  else img.remove();
+  clearImgSel();
+  onEdit(); updateCounts(); updatePreview();
+  toast('已删除第 ' + (i + 1) + ' 张图片');
+}
+
+function initImgOps() {
+  if (!editor) return;
+  const bar = imgBar();
+  document.getElementById('imgUp').onclick = () => { if (pickedImg && !moveImg(pickedImg, 'up')) toast('已经是第一张了'); };
+  document.getElementById('imgDown').onclick = () => { if (pickedImg && !moveImg(pickedImg, 'down')) toast('已经是最后一张了'); };
+  document.getElementById('imgDel').onclick = () => { if (pickedImg) delImg(pickedImg); };
+
+  editor.addEventListener('click', e => {
+    if (e.target && e.target.tagName === 'IMG') { selectImg(e.target); return; }
+    if (!bar || !bar.contains(e.target)) clearImgSel();
+  });
+  // 点别处 / 滚动 / 改窗口大小时把操作条收起来（位置会飘）
+  document.addEventListener('scroll', () => { if (pickedImg) selectImg(pickedImg); }, true);
+  window.addEventListener('resize', clearImgSel);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Delete' && pickedImg && document.activeElement !== editor) { e.preventDefault(); delImg(pickedImg); }
+    if (e.key === 'Escape') clearImgSel();
+  });
+
+  // 拖拽排序：contenteditable 里 HTML5 DnD 有时不灵（各家实现不一致），
+  // 所以拖拽只是"锦上添花"，上移/下移按钮才是稳定可靠的那一档
+  editor.addEventListener('dragstart', e => {
+    if (e.target && e.target.tagName === 'IMG') {
+      e.target.classList.add('dragging');
+      try { e.dataTransfer.setData('text/plain', 'img'); e.dataTransfer.effectAllowed = 'move'; } catch (err) {}
+    }
+  });
+  editor.addEventListener('dragend', e => { if (e.target) e.target.classList.remove('dragging'); });
+  editor.addEventListener('dragover', e => { if (e.target && e.target.tagName === 'IMG') e.preventDefault(); });
+  editor.addEventListener('drop', e => {
+    const t = e.target;
+    if (!t || t.tagName !== 'IMG') return;
+    const src = editor.querySelector('img.dragging');
+    if (!src || src === t) return;
+    e.preventDefault();
+    const nodes = Array.from(editor.querySelectorAll('img'));
+    moveImg(src, nodes.indexOf(src) > nodes.indexOf(t) ? 'up' : 'down');
+  });
+}
+
+// ---------- 发布前检查清单（preflight）----------
+const LAST_POST_KEY = 'ugreen_last_post_at';   // 上次发帖时间，用来算官方限流倒计时
+const POST_MIN_GAP = 60;                       // 秒：Discuz 常见"发帖间隔"限制
+
+function plainText() { return editor.innerText.replace(/\s+/g, ' ').trim(); }
+
+function buildPreflight(board, submit) {
+  const block = [], warn = [], info = [];
+  const title = document.getElementById('postTitle').value.trim();
+  const body = plainText();
+  const imgs = editor.querySelectorAll('img').length;
+  const titleLen = [...title].length;
+
+  if (!title) block.push('标题还没填 —— 空标题会被论坛直接拒绝');
+  else if (titleLen > 80) block.push('标题 ' + titleLen + ' 字，超过上限 80 字，会被截断');
+  else if (titleLen > 40) warn.push('标题 ' + titleLen + ' 字，论坛建议 40 字以内，超出部分可能显示不全');
+
+  if (!body && !imgs) block.push('正文是空的 —— 至少写点什么再发');
+  else if (!body && imgs) warn.push('正文只有图片没有文字，容易被判为水帖');
+  else if (body.length < 20) warn.push('正文只有 ' + body.length + ' 字，太短了，容易被当水帖');
+
+  if (!currentAccount) info.push('当前用的是默认账号');
+  try {
+    const last = Number(localStorage.getItem(LAST_POST_KEY) || 0);
+    if (last) {
+      const gap = Math.ceil((Date.now() - last) / 1000);
+      if (gap < POST_MIN_GAP) {
+        const wait = POST_MIN_GAP - gap;
+        (submit ? block : warn).push('距上次发帖才 ' + gap + ' 秒 —— 官方有限流（约 60 秒一帖），再等 ' + wait + ' 秒再' + (submit ? '发' : '填入'));
+      } else info.push('距上次发帖 ' + gap + ' 秒，间隔没问题');
+    }
+  } catch (e) {}
+
+  if (board && !board.canPost) block.push('「' + board.name + '」当前账号没有发帖权限');
+  if (imgs) info.push('将上传 ' + imgs + ' 张图片');
+  return { block, warn, info, board, submit };
+}
+
+async function showPreflight(pf) {
+  const lines = []
+    .concat(pf.block.map(t => '✗ ' + t))
+    .concat(pf.warn.map(t => '⚠️ ' + t))
+    .concat(pf.info.map(t => '· ' + t));
+  const ok = await modal({
+    title: '发布前检查',
+    okText: '继续',
+    msg: '发到：绿联社区 · ' + (pf.board ? pf.board.name : '') +
+      '\n\n' + lines.join('\n') +
+      '\n\n⚠️ 的是提醒，确认没问题就点「继续」。',
+  });
+  return !!ok;
+}
+
+/** 发布成功后记一下时间，下次 preflight 就能算限流倒计时 */
+function markPosted() {
+  try { localStorage.setItem(LAST_POST_KEY, String(Date.now())); } catch (e) {}
+}
+
+// 降级模式用的复制：优先 async clipboard API，非 http 环境/无权限时退回 execCommand
+async function copyFallbackHtml(fb) {
+  const text = '标题：' + (fb.title || '') + '\n\n' + String(fb.html || '');
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (e) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return ok;
+    } catch (e2) { return false; }
+  }
+}
+
+// ---------- 提示条：可关闭（记住已读）+ 两条提示轮换 ----------
+const HINT_OFF_KEY = 'ugreen_hint_off';
+function initHintBar() {
+  const bar = document.getElementById('hintBar');
+  const txt = document.getElementById('hintText');
+  const close = document.getElementById('hintClose');
+  if (!bar || !txt) return;
+  const tips = [
+    '💡 截图可直接在本编辑器中粘贴（按 <b>Ctrl+V</b>），图片自动插入（一次粘多张也行）。也可以把图片文件拖进编辑区。',
+    '🩺 发不了帖 / 报错看不懂？点右上角「🩺 体检」自查；要给作者反馈就点右下角的球，下载诊断包发过来。',
+  ];
+  let i = 0;
+  try { if (localStorage.getItem(HINT_OFF_KEY) === '1') { bar.style.display = 'none'; return; } } catch (e) {}
+  close.addEventListener('click', () => {
+    bar.style.display = 'none';
+    try { localStorage.setItem(HINT_OFF_KEY, '1'); } catch (e) {}
+    if (tipTimer) { clearInterval(tipTimer); tipTimer = null; }
+  });
+  // 两条轮换：截图用法是高频刚需，排错入口平时想不起来，轮流露个脸
+  let tipTimer = setInterval(() => {
+    if (document.hidden) return;
+    i = (i + 1) % tips.length;
+    txt.style.opacity = '0';
+    setTimeout(() => { txt.innerHTML = tips[i]; txt.style.opacity = '1'; }, 260);
+  }, 9000);
+}
+
+// ---------- 启动 ----------
+checkLogin();
+refreshDraftSel();
+updateCounts();
+updateTitleCount();
+updatePreview();
+initHintBar();
+initImgOps();       // 图片选中/排序/删除（V1.0.2）
+initFab();          // 反馈球：恢复上次拖到的位置 + 绑定拖动
+loadAccounts().then(() => loadBoards(false));
+</script>
+</body>
+</html>
