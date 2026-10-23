@@ -10,6 +10,7 @@ const { diagnosePage } = require('./doctor');
 const fa = require('./forum_adapter');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..', '..'); // 绿联社区发帖工具/
 
@@ -224,32 +225,115 @@ class Poster {
     if (!images || !images.length) { this.log('无图片，跳过上传'); return; }
     const missing = images.filter(p => !fs.existsSync(p));
     if (missing.length) throw new Error('图片不存在: ' + missing.join(', '));
-    this.log('上传 ' + images.length + ' 张图片...');
+
+    // 坑（V1.6.3 修）：正文里同一张图用了两次时（MD5 相同，粘贴两次或复制段落都会造成），
+    // Discuz 会拒收重复附件 —— 列表不新增，差集永远差一张，卡死 90 秒
+    // （实测：18 张里 1 对重复 → 第 2 批卡在 7/8）。
+    // 对策：上传前按内容去重，重复的位置直接复用第一个的 aid —— 正文两处显示同一张图，正合原意。
+    const md5s = images.map(p => crypto.createHash('md5').update(fs.readFileSync(p)).digest('hex'));
+    const uniqueFiles = [], uniqueMd5s = [], seenMd5 = new Set();
+    images.forEach((p, i) => {
+      if (!seenMd5.has(md5s[i])) { seenMd5.add(md5s[i]); uniqueFiles.push(p); uniqueMd5s.push(md5s[i]); }
+    });
+    if (uniqueFiles.length < images.length) {
+      this.log('检测到 ' + (images.length - uniqueFiles.length) + ' 张重复图，自动复用第一个附件（不会重复上传）');
+    }
+
+    this.log('上传 ' + uniqueFiles.length + ' 张图片（去重后）...');
     const imgBtn = await fa.resolveLocator(page, 'imageBtn');
     if (!imgBtn) throw fa.anchorError('imageBtn', '打开图片上传失败');
     await imgBtn.first().click();
     await sleep(1500);
     const fileLoc = await fa.resolveLocator(page, 'fileInput');
     if (!fileLoc) throw fa.anchorError('fileInput', '上传图片失败');
-    await fileLoc.first().setInputFiles(images);
     const listSel = await fa.resolveSelector(page, 'attachList');
-    let ok = false;
-    for (let i = 0; i < 60; i++) {
-      await sleep(1000);
-      const cnt = await page.evaluate((sel) => {
-        const d = sel ? document.querySelector(sel) : null;
-        return d ? d.querySelectorAll('img[id^="image_"]').length : 0;
-      }, listSel);
-      if (cnt >= images.length) { ok = true; break; }
-      if (i % 5 === 4) this.log('等待上传... ' + cnt + '/' + images.length);
-    }
-    if (!ok) throw new Error('图片上传超时（等了 60 秒还没全部上传完）');
-    const aids = await page.evaluate((sel) => {
+
+    // 坑（V1.6.2/V1.6.3 修）：Discuz 的附件弹层有三个特性叠在一起，多图上传必翻车：
+    //   ① 列表会把"之前上传过的所有附件"都列出来 —— 不做差集，历史附件会错位占用占位符，
+    //      本次真正上传的图反而成了"未使用附件"（实测 18 张只进去 1 张缩略图）；
+    //   ② 列表是异步加载的 —— 打开弹层 1.5 秒时可能只渲染了一半，这时快照"已有附件"
+    //      会漏掉一批，之后差集把"晚渲染出来的历史附件"也算成新增，数量对不上直接报废
+    //      （实测差集 36 ≠ 18，18 张图一张都没插进去）；
+    //   ③ 列表有分页 —— 一次传太多，最后几张会掉到第二页，第一页永远等不齐（实测卡在 17/18）。
+    // 对策：快照前等列表"加载稳定"（数量连续 3 秒不变）+ 分批上传 + 收集不足时自动翻页。
+    const BATCH = 8;
+    const grabIds = () => page.evaluate((sel) => {
       const d = sel ? document.querySelector(sel) : null;
-      if (!d) return [];
-      return Array.from(d.querySelectorAll('img[id^="image_"]')).map(i => ({ aid: i.id.replace('image_', ''), url: i.src }));
+      return d ? Array.from(d.querySelectorAll('img[id^="image_"]')).map(i => i.id) : [];
     }, listSel);
-    this.log('上传完成, aids: ' + aids.map(a => a.aid).join(','));
+    const grabAll = () => page.evaluate((sel) => {
+      const d = sel ? document.querySelector(sel) : null;
+      return d ? Array.from(d.querySelectorAll('img[id^="image_"]')).map(el => ({ id: el.id, aid: el.id.replace('image_', ''), url: el.src })) : [];
+    }, listSel);
+
+    async function waitListStable() {
+      // 列表数量连续 3 秒不变才认为加载完了（历史附件是 ajax 异步渲染的）
+      let prev = -1, stable = 0;
+      for (let i = 0; i < 20; i++) {
+        await sleep(1000);
+        const n = (await grabIds()).length;
+        if (n === prev) { if (++stable >= 3) return; }
+        else { prev = n; stable = 0; }
+      }
+    }
+
+    async function tryNextPage() {
+      // 附件列表分页：多种 Discuz 模板写法，找到一个点一个，找不到返回 false
+      return await page.evaluate(() => {
+        const cands = [
+          ...document.querySelectorAll('#attachlist .pgs a, #attachlist .pg a, .attachlist .pgs a'),
+          ...Array.from(document.querySelectorAll('a, button')).filter(a =>
+            /attachlist|attach/i.test(a.getAttribute('onclick') || '') && /下一页|›|»/.test(a.innerText || '')),
+        ];
+        for (const a of cands) { a.click(); return true; }
+        return false;
+      });
+    }
+
+    await waitListStable();
+    const known = new Set(await grabIds());
+    this.log('附件列表里已有 ' + known.size + ' 个历史附件（会自动跳过）');
+    const aids = [];
+    for (let start = 0; start < uniqueFiles.length; start += BATCH) {
+      const batch = uniqueFiles.slice(start, start + BATCH);
+      if (start > 0) this.log('上传第 ' + (start / BATCH + 1) + ' 批（' + batch.length + ' 张）...');
+      await fileLoc.first().setInputFiles(batch);
+      let got = 0, all = [];
+      for (let i = 0; i < 90; i++) {
+        await sleep(1000);
+        all = await grabAll();
+        got = all.filter(a => !known.has(a.id)).length;
+        if (got >= batch.length) break;
+        if (i % 5 === 4) this.log('等待上传... ' + got + '/' + batch.length + '（本批）');
+      }
+      // 收集不足：先等列表稳定（可能有渲染延迟），再尝试翻页把剩下的捞回来
+      if (got < batch.length) {
+        await waitListStable();
+        for (let p = 0; p < 6 && got < batch.length; p++) {
+          if (!(await tryNextPage())) break;
+          await sleep(1500);
+          all = await grabAll();
+          got = all.filter(a => !known.has(a.id)).length;
+        }
+      }
+      if (got < batch.length) {
+        throw new Error('图片上传超时（本批 ' + batch.length + ' 张，等了 90 秒并翻页后只找到 ' + got +
+          ' 张）。若某张图反复传不上去，多半是论坛拒绝了这张图（体积/格式），可删掉重贴试试');
+      }
+      // 差集 = 本批新增，DOM 顺序即上传顺序
+      const batchAids = all.filter(a => !known.has(a.id));
+      batchAids.forEach(a => known.add(a.id));
+      aids.push(...batchAids);
+    }
+    if (aids.length !== uniqueFiles.length) {
+      throw new Error('附件列表异常：本次上传 ' + uniqueFiles.length + ' 张，但只收集到 ' + aids.length +
+        ' 个附件。请重试；若反复出现请点「🩺 体检」后把诊断包发给作者');
+    }
+    // 把 unique 附件映射回正文每个占位符（重复的图复用同一个 aid）
+    const md5ToAid = {};
+    uniqueMd5s.forEach((m, idx) => { md5ToAid[m] = aids[idx]; });
+    const slotAids = md5s.map(m => md5ToAid[m]);
+    this.log('上传完成, aids: ' + slotAids.map(a => a.aid).join(','));
     // 坑（V1.4.0 修）：iframeSel 曾经只在 fill() 里有，uploadImages 直接拿来用会
     // ReferenceError —— 带图发帖必挂。之前回归样例里没图，这个坑一直没暴露出来。
     const iframeSel = await fa.resolveSelector(page, 'editorIframe');
@@ -259,11 +343,26 @@ class Poster {
       const doc = f.contentDocument;
       let html = doc.body.innerHTML;
       aids.forEach((a, i) => {
-        const src = a.url.replace(/&/g, '&amp;');
+        // 坑（V1.6.3 修）：附件列表给的 URL 里 size 和 key 是绑定的 ——
+        // 想"换个大尺寸"把 size 去掉，结果 key 校验失败直接 302 跳走，图片加载不出来
+        // （实测：原样 200 返回图片；剥掉 size 后 302）。所以这里原样使用，一个字符都别改。
+        // 编辑器里显示的是缩略图，但发布后论坛按 aid 渲染原图 —— 效果是对的。
+        const src = a.url;
         html = html.split(`[[IMG_${i + 1}]]`).join(`<img src="${src}" border="0" aid="attachimg_${a.aid}" alt="">`);
       });
       doc.body.innerHTML = html;
-    }, { aids, iframeSel });
+    }, { aids: slotAids, iframeSel });
+    // 验收：图片不是"标签在就行"，必须真的加载得出来（naturalWidth=0 说明是破图）。
+    // 一定要等一会儿再查 —— 刚写进 DOM 时图片还没开始下载，查出来全是 0（实测踩过）
+    await sleep(6000);
+    const imgStat = await page.evaluate((iframeSel) => {
+      const f = document.querySelector(iframeSel);
+      if (!f || !f.contentDocument) return { total: 0, loaded: 0 };
+      const imgs = Array.from(f.contentDocument.querySelectorAll('img'));
+      return { total: imgs.length, loaded: imgs.filter(i => i.complete && i.naturalWidth > 0).length };
+    }, iframeSel);
+    this.log('图片验收: ' + imgStat.loaded + '/' + imgStat.total + ' 张成功加载' +
+      (imgStat.loaded < imgStat.total ? '（有图没加载出来，多半是论坛拒绝了这张图）' : ''));
     // 关掉 Discuz 的"插入附件"弹层（多候选，找不到就跳过 —— 有的模板没有这个按钮）
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll('button, a'));
