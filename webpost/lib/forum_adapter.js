@@ -30,6 +30,27 @@ const ANCHORS = {
     kind: 'node',
     candidates: ['#typeid', 'input[name="typeid"]', 'form#postform input[name="typeid"]'],
   },
+  // 2026-11 官方改版新增：内容声明（必填）
+  // 值: 1=AI生成 2=个人原创 3=内容转载 4=个人观点 5=营销推广 6=虚构娱乐 7=AI辅助
+  contentClaim: {
+    label: '内容声明单选组',
+    kind: 'node',
+    candidates: [
+      'input[name="declaration_type"]',
+      '.thread-declaration-form input[type="radio"]',
+      'input[name*="declaration"][type="radio"]',
+    ],
+  },
+  editorModeBBCode: {
+    label: '编辑器模式（BBCode）',
+    kind: 'node',
+    candidates: ['input[name="content_format_selector"][value="0"]'],
+  },
+  editorModeMarkdown: {
+    label: '编辑器模式（Markdown）',
+    kind: 'node',
+    candidates: ['input[name="content_format_selector"][value="1"]'],
+  },
   editorIframe: {
     label: '正文编辑器（富文本）',
     kind: 'node',
@@ -69,11 +90,24 @@ const ANCHORS = {
     label: '发表帖子按钮',
     kind: 'click',
     // candidates 必须是"浏览器原生合法"的选择器（探测与 evaluate 走这条）
+    // 2026-11 改版：页面上出现两个 id="postsubmit" —— 第一个是"发表帖子"，
+    // 第二个其实是"保存草稿"（onclick 里先把 postsave 置 1 再 click 第一个）。
+    // 用 name="topicsubmit" 精确定位真正的发表按钮，绝不能只靠 #postsubmit。
     candidates: [
+      'button[name="topicsubmit"]',
+      'form#postform button[name="topicsubmit"]',
       'form#postform #postsubmit',
       '#postsubmit',
       'input[name="topicsubmit"]',
+    ],
+    pwCandidates: [
       'button[name="topicsubmit"]',
+      'form#postform button[name="topicsubmit"]',
+      'form#postform #postsubmit',
+      '#postsubmit:visible',
+      'input[name="topicsubmit"]',
+      'button:has-text("发表帖子")',
+      'button:has-text("发表")',
     ],
     // pwCandidates 是 Playwright 专用语法（:visible / :has-text），只能给 locator 用。
     // 踩坑：这两种语法塞进 document.querySelector 会直接抛错被 try/catch 吞掉，

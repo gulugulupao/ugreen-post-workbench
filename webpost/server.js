@@ -780,7 +780,7 @@ const server = http.createServer(async (req, res) => {
         poster = new Poster(m => { logs.push(m); console.log('[发布]', m); }, { shotDir: SHOTS, account: body.account || '' });
         await poster.launch();
         await poster.openEditor(String(body.fid || '9'));
-        await poster.fill(body.title, html, body.cat || '');
+        await poster.fill(body.title, html, body.cat || '', body.claim || '2');
         await poster.uploadImages(images);
         const shot = await poster.screenshot(submit ? 'webpost_published.png' : 'webpost_preview.png');
         let postUrl = '';

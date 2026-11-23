@@ -169,8 +169,44 @@ class Poster {
     }
   }
 
-  async fill(title, html, cat) {
+  async fill(title, html, cat, claim) {
     const page = this.page;
+
+    // 2026-11 官方改版：新增"编辑器模式"切换（BBCode / Markdown）。
+    // Markdown 模式下 #e_iframe 消失、换成 Toast UI Editor —— 我们的 HTML 写入通道
+    // 会失效，发出空帖。这里自动切回 BBCode（工具全程只走 BBCode 通道）。
+    const mode = await page.evaluate(() => {
+      const md = document.querySelector('input[name="content_format_selector"][value="1"]');
+      return md && md.checked ? 'markdown' : 'bbcode';
+    });
+    if (mode === 'markdown') {
+      try {
+        await page.locator('input[name="content_format_selector"][value="0"]').first().check({ timeout: 8000 });
+        await sleep(1200);
+        this.log('编辑器原为 Markdown 模式，已自动切回 BBCode（本工具用 BBCode 通道写入）');
+      } catch (e) {
+        throw new Error('论坛正处于 Markdown 编辑器模式，工具无法写入正文。请手动切回「BBCode」再试');
+      }
+    }
+
+    // 2026-11 官方改版：新增必填「内容声明」。不填会被拦下（实测不跳转、发不出去）。
+    // 默认「个人原创」(value=2)；调用方可传 claim 覆盖（1=AI生成 2=个人原创 3=转载
+    // 4=个人观点 5=营销推广 6=虚构娱乐 7=AI辅助）。
+    const wantClaim = String(claim || '2');
+    const claimSel = await fa.resolveLocator(page, 'contentClaim');
+    if (claimSel) {
+      const picked = await page.evaluate((v) => {
+        const radios = Array.from(document.querySelectorAll('input[name="declaration_type"]'));
+        const target = radios.find(r => r.value === v) || radios.find(r => r.value === '2');
+        if (!target) return null;
+        target.click();
+        const lbl = target.parentElement ? (target.parentElement.innerText || '').trim() : '';
+        return { value: target.value, label: lbl };
+      }, wantClaim);
+      if (picked) this.log('内容声明: ' + picked.label + ' (value=' + picked.value + ')');
+      else this.log('内容声明: 未找到可选项（新版论坛可能又改了，请跑体检）');
+    }
+
     // 标题/分类全部走适配器（多候选），改版时只改 forum_adapter.js
     const subj = await fa.resolveLocator(page, 'subject');
     if (!subj) throw fa.anchorError('subject', '填标题失败');

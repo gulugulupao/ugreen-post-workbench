@@ -142,6 +142,16 @@ async function diagnosePage(page) {
     if (used) add('（当前生效写法）', true, used, '');
   }
 
+  // 9.5 2026-11 改版：内容声明（必填）
+  if (enteredPostPage) {
+    const decl = await page.evaluate(() => {
+      const radios = Array.from(document.querySelectorAll('input[name="declaration_type"]'));
+      return { count: radios.length };
+    });
+    add('内容声明（必填）', decl.count > 0, decl.count ? ('找到 ' + decl.count + ' 个选项') : '找不到声明选项',
+      decl.count === 0 ? '论坛又改版了，工具可能需要更新适配器' : '');
+  }
+
   // 阻断项：只有"根因"和真正的元素缺失才算，
   // 未进入发帖页时其余项已写成"无法检查"，不再重复计入。
   const rootNames = enteredPostPage
