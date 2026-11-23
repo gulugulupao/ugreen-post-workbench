@@ -275,7 +275,52 @@ class Poster {
       this.log('检测到 ' + (images.length - uniqueFiles.length) + ' 张重复图，自动复用第一个附件（不会重复上传）');
     }
 
-    this.log('上传 ' + uniqueFiles.length + ' 张图片（去重后）...');
+    // 上传前预检（V1.8.0）：把每张图的格式/体积/尺寸/重复情况先报一遍，
+    // 有问题的当场指出 —— 不用等发帖失败才知道是哪张。
+    // 用户实测诉求："万一今后还有类似图片，需要提前排查出来，避免只有发帖失败后才知道"
+    function imageInfo(p) {
+      let w = '?', h = '?', fmt = '?';
+      try {
+        const b = fs.readFileSync(p);
+        if (b.slice(0, 8).toString('hex') === '89504e470d0a1a0a') {
+          fmt = 'PNG'; w = b.readUInt32BE(16); h = b.readUInt32BE(20);
+        } else if (b.slice(0, 3).toString('hex') === 'ffd8ff') {
+          fmt = 'JPG';
+          let i = 2;
+          while (i < b.length - 10) {
+            if (b[i] !== 0xFF) { i++; continue; }
+            const m = b[i + 1];
+            if (m >= 0xC0 && m <= 0xCF && m !== 0xC4 && m !== 0xC8 && m !== 0xCC) {
+              h = b.readUInt16BE(i + 5); w = b.readUInt16BE(i + 7); break;
+            }
+            i += 2 + b.readUInt16BE(i + 2);
+          }
+        } else if (b.slice(0, 6).toString() === 'GIF87a' || b.slice(0, 6).toString() === 'GIF89a') {
+          fmt = 'GIF'; w = b.readUInt16BE(6); h = b.readUInt16BE(8);
+        }
+        return { name: path.basename(p), fmt, w, h, kb: Math.round(b.length / 1024) };
+      } catch (e) { return { name: path.basename(p), fmt: '?', w: '?', h: '?', kb: -1 }; }
+    }
+    const infos = uniqueFiles.map(imageInfo);
+    this.log('图片预检（' + infos.length + ' 张）:');
+    infos.forEach((x, i) => {
+      let flags = [];
+      if (!['PNG', 'JPG', 'GIF'].includes(x.fmt)) flags.push('格式不在论坛白名单(jpg/jpeg/gif/png)');
+      if (x.kb > 10 * 1024) flags.push('超过 10MB');
+      if (typeof x.w === 'number' && (x.w > 8000 || x.h > 8000)) flags.push('尺寸极大');
+      this.log('  ' + (i + 1) + '. ' + x.name + ' · ' + x.fmt + ' · ' + x.w + 'x' + x.h + ' · ' + x.kb + 'KB' + (flags.length ? ' ⚠ ' + flags.join('/') : ''));
+    });
+
+    const problems = infos.map((x, i) => ({ ...x, idx: i + 1,
+      bad: !['PNG', 'JPG', 'GIF'].includes(x.fmt) || x.kb > 10 * 1024 || (typeof x.w === 'number' && (x.w > 8000 || x.h > 8000)),
+    })).filter(x => x.bad);
+    if (problems.length) {
+      const list = problems.map(x => '  第 ' + x.idx + ' 张「' + x.name + '」· ' + x.fmt + ' · ' + x.w + 'x' + x.h + ' · ' + x.kb + 'KB').join('\n');
+      throw new Error('图片预检发现 ' + problems.length + ' 张不可能通过论坛上传的图片，已提前拦下（没有白等 90 秒）：\n' +
+        list + '\n\n论坛只收 jpg/jpeg/gif/png，单张不超过 10MB。请在编辑器里删掉这些图、重新粘贴有效图片再试。');
+    }
+    this.log('预检通过：' + infos.length + ' 张图格式/体积/尺寸均正常');
+    this.log('开始上传 ' + uniqueFiles.length + ' 张图片（逐张上传，失败能定位到具体哪张）...');
     const imgBtn = await fa.resolveLocator(page, 'imageBtn');
     if (!imgBtn) throw fa.anchorError('imageBtn', '打开图片上传失败');
     await imgBtn.first().click();
@@ -291,8 +336,10 @@ class Poster {
     //      会漏掉一批，之后差集把"晚渲染出来的历史附件"也算成新增，数量对不上直接报废
     //      （实测差集 36 ≠ 18，18 张图一张都没插进去）；
     //   ③ 列表有分页 —— 一次传太多，最后几张会掉到第二页，第一页永远等不齐（实测卡在 17/18）。
-    // 对策：快照前等列表"加载稳定"（数量连续 3 秒不变）+ 分批上传 + 收集不足时自动翻页。
-    const BATCH = 8;
+    // 对策：快照前等列表"加载稳定"（数量连续 3 秒不变）+ 逐张上传 + 精确报错。
+    // V1.8.0：从"每批 8 张"改为"逐张" —— 批量上传时若少一张，只能报"5 张里少了 1 张"，
+    // 说不出是哪张；逐张上传能精确定位到具体文件，失败时直接报出文件名。
+    const BATCH = 1;
     const grabIds = () => page.evaluate((sel) => {
       const d = sel ? document.querySelector(sel) : null;
       return d ? Array.from(d.querySelectorAll('img[id^="image_"]')).map(i => i.id) : [];
@@ -332,7 +379,8 @@ class Poster {
     const aids = [];
     for (let start = 0; start < uniqueFiles.length; start += BATCH) {
       const batch = uniqueFiles.slice(start, start + BATCH);
-      if (start > 0) this.log('上传第 ' + (start / BATCH + 1) + ' 批（' + batch.length + ' 张）...');
+      this.log('上传第 ' + (start + 1) + '/' + uniqueFiles.length + ' 张: ' + path.basename(batch[0]) +
+        ' (' + infos[start].fmt + ' ' + infos[start].w + 'x' + infos[start].h + ' ' + infos[start].kb + 'KB)');
       await fileLoc.first().setInputFiles(batch);
       let got = 0, all = [];
       for (let i = 0; i < 90; i++) {
@@ -353,8 +401,13 @@ class Poster {
         }
       }
       if (got < batch.length) {
-        throw new Error('图片上传超时（本批 ' + batch.length + ' 张，等了 90 秒并翻页后只找到 ' + got +
-          ' 张）。若某张图反复传不上去，多半是论坛拒绝了这张图（体积/格式），可删掉重贴试试');
+        const failedNames = [infos[start].name];
+        throw new Error('图片上传失败：第 ' + (start + 1) + ' 张「' + failedNames[0] + '」' +
+          '（' + infos[start].fmt + ' ' + infos[start].w + 'x' + infos[start].h + ' ' + infos[start].kb + 'KB）' +
+          '等了 90 秒仍未出现在论坛附件列表。\n' +
+          '已成功 ' + aids.length + '/' + uniqueFiles.length + ' 张；' +
+          '这张图可能被论坛拒绝（格式/体积/内容），建议删掉它重新粘贴或换一张。\n' +
+          '如果想绕过，请点「填入论坛编辑器（不发布）」，在官方页面手动补传这张图。');
       }
       // 差集 = 本批新增，DOM 顺序即上传顺序
       const batchAids = all.filter(a => !known.has(a.id));
